@@ -1,0 +1,8 @@
+numba==0.65.1
+numpy==2.4.6
+numpy_quaternion==2024.0.13
+pyside6==6.11.1
+pyside6_addons==6.11.1
+pyside6_essentials==6.11.1
+pyvista==0.48.4
+pyvistaqt==0.11.4
