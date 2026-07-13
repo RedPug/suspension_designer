@@ -1,0 +1,229 @@
+{
+  "type": "editor",
+  "name": "Basic Suspension",
+  "id": "3dfcf745-ff0f-43ea-a5e8-e24a0616083a",
+  "nodes": [
+    {
+      "id": "4f71d11c-f44f-4934-b71d-e87fa81654c8",
+      "name": "Node 0",
+      "world_position": [
+        0.267,
+        0.26,
+        -0.165
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "01221927-08e7-4282-a55e-91e223a86e92",
+      "name": "Node 1",
+      "world_position": [
+        0.236,
+        0.11,
+        -0.153
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "4602623a-09b7-4346-964c-0854ae56ab58",
+      "name": "Node 2",
+      "world_position": [
+        0.24,
+        0.096,
+        0.217
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
+      "name": "Node 3",
+      "world_position": [
+        0.245,
+        0.278,
+        0.233
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "e7bfe798-d6fe-418e-b027-f265ff1a9f22",
+      "name": "Node 4",
+      "world_position": [
+        0.565,
+        0.109,
+        -0.005
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "6b271f4b-5a44-4ddb-b67d-93d409e83e58",
+      "name": "Node 5",
+      "world_position": [
+        0.539,
+        0.3,
+        0.0
+      ],
+      "locked_plane_id": "f19a0776-a7dc-4e5b-ba05-276ae1202238"
+    },
+    {
+      "id": "df522e2b-8839-428b-8e93-79e89fc16143",
+      "name": "Node 6",
+      "world_position": [
+        0.57,
+        0.17,
+        0.075
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "e085b9df-7aa1-473c-8d86-621992f9c530",
+      "name": "Node 7",
+      "world_position": [
+        0.213,
+        0.155,
+        0.045
+      ],
+      "locked_plane_id": null
+    }
+  ],
+  "edges": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      3,
+      0
+    ],
+    [
+      4,
+      5
+    ],
+    [
+      5,
+      6
+    ],
+    [
+      6,
+      4
+    ],
+    [
+      0,
+      3
+    ],
+    [
+      3,
+      5
+    ],
+    [
+      5,
+      0
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      4
+    ],
+    [
+      4,
+      1
+    ],
+    [
+      6,
+      7
+    ],
+    [
+      7,
+      6
+    ]
+  ],
+  "planes": [
+    {
+      "name": "Rocker Plane",
+      "id": "f19a0776-a7dc-4e5b-ba05-276ae1202238",
+      "mode": "containing",
+      "p0": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "p1": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "p2": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "Chassis",
+      "id": "592605f7-905a-453d-a9ed-d1b0d3ecad56",
+      "node_ids": [
+        "4f71d11c-f44f-4934-b71d-e87fa81654c8",
+        "01221927-08e7-4282-a55e-91e223a86e92",
+        "4602623a-09b7-4346-964c-0854ae56ab58",
+        "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c"
+      ]
+    },
+    {
+      "name": "Upper Control Arm",
+      "id": "e004f939-5690-471d-a673-0653b326b5a7",
+      "node_ids": [
+        "4f71d11c-f44f-4934-b71d-e87fa81654c8",
+        "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
+        "6b271f4b-5a44-4ddb-b67d-93d409e83e58"
+      ]
+    },
+    {
+      "name": "Lower Control Arm",
+      "id": "4f7a2965-4f21-4cc2-a563-3a26e631970f",
+      "node_ids": [
+        "01221927-08e7-4282-a55e-91e223a86e92",
+        "4602623a-09b7-4346-964c-0854ae56ab58",
+        "e7bfe798-d6fe-418e-b027-f265ff1a9f22"
+      ]
+    },
+    {
+      "name": "Upright",
+      "id": "2f298951-9109-4960-9060-8f8fcbdbd084",
+      "node_ids": [
+        "e7bfe798-d6fe-418e-b027-f265ff1a9f22",
+        "6b271f4b-5a44-4ddb-b67d-93d409e83e58",
+        "df522e2b-8839-428b-8e93-79e89fc16143"
+      ]
+    },
+    {
+      "name": "Toe Rod",
+      "id": "a33119ed-0f68-4604-a6e2-20b2a79a10e4",
+      "node_ids": [
+        "df522e2b-8839-428b-8e93-79e89fc16143",
+        "e085b9df-7aa1-473c-8d86-621992f9c530"
+      ]
+    }
+  ],
+  "model_variables": [
+    {
+      "name": "Test",
+      "id": "e97a201c-8b3d-445a-87a6-a41b7e11ae06",
+      "type": "displacement",
+      "axis_x": 0.01,
+      "axis_y": 0.0,
+      "axis_z": 0.0,
+      "node_id": "6b271f4b-5a44-4ddb-b67d-93d409e83e58"
+    }
+  ]
+}

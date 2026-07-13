@@ -1,3 +1,4 @@
+import json
 import os
 # os.environ["QT_QUICK_BACKEND"] = "software" # or force a different backend
 # os.environ["QT_OPENGL"] = "software" # or force a different OpenGL implementation
@@ -43,11 +44,30 @@ window = MainWindow()
 window.resize(900, 600)
 window.show()
 
-doc = Document.load("C:\\Users\\thero\\Downloads\\test4.proj")
-window.document_manager.add_document(doc, select=True)
+if not os.path.exists("./user_settings.json"):
+    with open("./user_settings.json", "w") as f:
+        json.dump({}, f)
+
+with open("./user_settings.json", "r") as f:
+    user_settings = json.load(f)
+
+if user_settings.get("last_opened_files"):
+    files = user_settings["last_opened_files"]
+    for file in files:
+        if not os.path.exists(file):
+            print(f"Warning: Last opened file does not exist: {file}")
+            files.remove(file)
+
+    for file in files:
+        print(f"Loading last opened file: {file}")
+        doc = Document.load(file)
+        window.document_manager.add_document(doc, select=True)
+
+# doc = Document.load("C:\\Users\\thero\\Downloads\\test4.proj")
+# window.document_manager.add_document(doc, select=True)
 # window.tree_dock.refreshTree()
 
-old_scene = window.document_manager.get_document(0).scene_state
+# old_scene = window.document_manager.get_document(0).scene_state
 # old_scene.add_model_variable(DisplacementVariable(name="Test Variable"))
 
 
