@@ -100,15 +100,15 @@ class ModelVariable(QObject):
         self.did_change.emit()
     
     def evaluate(self) -> float:
-        pass
+        raise NotImplementedError("Subclasses should implement this method.")
 
     def prescribe(self, value: float):
-        pass
+        raise NotImplementedError("Subclasses should implement this method.")
 
     def get_property_list(self):
         return {}
     
-    def fill_references(self, nodes: list[EditorNode]):
+    def fill_references(self, id_to_element: dict[UUID, Any]):
         pass
     
     def to_dict(self):
