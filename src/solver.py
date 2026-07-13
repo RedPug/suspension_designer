@@ -4,6 +4,7 @@ import numpy as np
 from dataclasses import dataclass
 import time
 
+from model_variables import DisplacementVariable, DistanceVariable
 from src.scene import SceneState
 from src.math import get_rotation_matrix_from_quaternion, mult_quaternions
 
@@ -141,6 +142,11 @@ class RigidGroup:
             color=self.color
         )
         return new_group
+
+class CorrectionProvider:
+    def solve_for_correction(self) -> np.ndarray:
+        """Returns a 3D vector representing the correction to apply to a node to satisfy a constraint."""
+        raise NotImplementedError("Subclasses should implement this method.")
 
 class Linkage:
     def __init__(self, name: str, node1: Node, node2: Node, target_distance: Optional[float] = None):
@@ -292,13 +298,14 @@ class SolverState:
         return SolverState(groups=group_copy, linkages=linkage_copy, displacements=displacement_copy)
 
     @staticmethod
-    def from_connections(nodes: np.ndarray, node_groups: list[list[int]], displacements: list[tuple[int, list[float]]]) -> 'SolverState':
+    def from_connections(nodes: np.ndarray, node_groups: list[list[int]], displacements: list[tuple[int, list[float]]], extra_links: list[tuple[int, int, float]]) -> 'SolverState':
         """Utility function to create a system state from a list of nodes and their connections.
 
         Args:
             nodes (np.ndarray): An array of Node objects with global positions defined.
             node_groups (List[List[int]]): A list of lists, where each list contains the indices of nodes that belong to the same group.
             displacements (List[Tuple[int, List[float]]]): A list of tuples, where each tuple contains a node index and a list of displacement values.
+            extra_links (List[Tuple[int, int, float]]): A list of tuples, where each tuple contains two node indices and a target distance.
 
         Returns:
             SolverState: A new SolverState object with one RigidGroup containing all nodes and Linkages defined by the connections.
@@ -336,6 +343,12 @@ class SolverState:
             for i in range(len(arr)):
                 for j in range(i+1, len(arr)):
                     linkages.append(Linkage(name=f"linkage_{len(linkages)}", node1=arr[i], node2=arr[j]))
+
+
+        # add extra links
+        for node1_idx, node2_idx, target_distance in extra_links:
+            if 0 <= node1_idx < len(duplicate_nodes) and 0 <= node2_idx < len(duplicate_nodes):
+                linkages.append(Linkage(name=f"linkage_{len(linkages)}", node1=duplicate_nodes[node1_idx][0], node2=duplicate_nodes[node2_idx][0], target_distance=target_distance))
 
 
         disp: list[tuple[Node, tuple[float, float, float]]] = []
@@ -440,14 +453,33 @@ def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=10
     return SolverResult(system_state=system_copy, error=errors[-1], errors=errors, iterations=iterations, time=t1-t0, did_converge=did_converge)
 
 
-
-def solve(scene_state: SceneState, displacements: list[tuple[int, list[float]]], **kwargs) -> SolverResult:
+def solve(scene_state: SceneState, **kwargs) -> SolverResult:
     current_state = scene_state
 
+    nodes = np.array([n.world_position for n in current_state.nodes])
+
+    groups = [[current_state.nodes.index(n) for n in group.nodes] for group in current_state.groups]
+
+    displacements: list[tuple[int, np.ndarray]] = []
+    for variable in current_state.model_variables:
+        if isinstance(variable, DisplacementVariable):
+            node = variable.node
+            if node is not None:
+                displacements.append((current_state.nodes.index(node), variable.get_displacement(0.1)))
+
+    links: list[Linkage] = []
+    for variable in current_state.model_variables:
+        if isinstance(variable, DistanceVariable):
+            node1 = current_state.nodes.index(variable.node1)
+            node2 = current_state.nodes.index(variable.node2)
+            if node1 is not None and node2 is not None:
+                links.append((node1, node2, 0.1))
+
     solver_state = SolverState.from_connections(
-        nodes=np.array([n.world_position for n in current_state.nodes]),
-        node_groups=[[current_state.nodes.index(n) for n in group.nodes] for group in current_state.groups],
-        displacements=displacements)
+        nodes=nodes,
+        node_groups=groups,
+        displacements=displacements,
+        extra_links=links)
     
     solver_state.groups[0].locked = True
     

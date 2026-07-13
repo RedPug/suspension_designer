@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from PySide6.QtCore import (QObject, Signal)
+import numpy as np
 
 from src.properties import DropdownPropertyType, NumberPropertyType, Property, StringPropertyType
 from src.structures import EditorNode
@@ -174,6 +175,9 @@ class DisplacementVariable(ModelVariable):
     def axis_z(self, value):
         self._axis_z = float(value)
         self.did_change.emit()
+
+    def get_displacement(self, mag: float) -> np.ndarray:
+        return mag * np.array([self.axis_x, self.axis_y, self.axis_z])
 
     def get_property_list(self) -> dict[str, list[Property]]:
         return super().get_property_list() | {

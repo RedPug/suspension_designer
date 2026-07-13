@@ -198,6 +198,10 @@ class SceneState(QObject):
         self.edges = other.edges
         self.reference_planes = other.reference_planes
         self.groups = other.groups
+        self.model_variables = other.model_variables
         self.is_editable = other.is_editable
 
         self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+
+    def copy(self) -> 'SceneState':
+        return SceneState.from_dict(self.to_dict())
