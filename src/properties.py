@@ -240,6 +240,8 @@ class GroupEditor(QWidget):
 
     def _rebuild(self):
         t0 = perf_counter()
+        selected_ids = {node.id for node in self._selected_nodes}
+
         # Remove old rows
         while self.rows_layout.count():
             item = self.rows_layout.takeAt(0)
@@ -254,7 +256,7 @@ class GroupEditor(QWidget):
         self.combo.addItem("Add node...", None)
 
         for node in self._all_nodes:
-            if node not in self._selected_nodes:
+            if node.id not in selected_ids:
                 self.combo.addItem(node.name, node)
 
         self.combo.setCurrentIndex(0)

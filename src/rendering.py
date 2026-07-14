@@ -517,6 +517,11 @@ class Viewport3D(QOpenGLWidget):
         cam_pts = self.camera.world_to_camera(points)
 
         edges = self.scene_state.edges
+        selected = self.selection_manager.get_selected()
+        selected_group_node_ids = None
+
+        if type(selected) == NodeGroup:
+            selected_group_node_ids = {node.id for node in selected.nodes}
 
         glLoadIdentity()
 
@@ -526,12 +531,13 @@ class Viewport3D(QOpenGLWidget):
 
             glTranslatef(p[0], p[1], p[2])
 
-            is_selected = self.selection_manager.get_selected() is self.scene_state.nodes[i]
+            node = self.scene_state.nodes[i]
+            is_selected = selected is node
             is_group_selected = False
-            if type(self.selection_manager.get_selected()) == NodeGroup:
-                is_group_selected = self.scene_state.nodes[i] in self.selection_manager.get_selected().nodes
+            if selected_group_node_ids is not None:
+                is_group_selected = node.id in selected_group_node_ids
 
-            is_subselection = self.scene_state.nodes[i] in self.selection_manager.subselections
+            is_subselection = node in self.selection_manager.subselections
 
             if is_selected or is_group_selected:
                 glColor3f(0.0, 0.6, 1.0)  # Blue for selected nodes

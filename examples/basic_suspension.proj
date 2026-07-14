@@ -1,7 +1,7 @@
 {
   "type": "editor",
   "name": "Basic Suspension",
-  "id": "3dfcf745-ff0f-43ea-a5e8-e24a0616083a",
+  "id": "94e6ac49-7349-407e-9521-d1964d737222",
   "nodes": [
     {
       "id": "4f71d11c-f44f-4934-b71d-e87fa81654c8",
@@ -217,7 +217,7 @@
   ],
   "model_variables": [
     {
-      "name": "Test",
+      "name": "Heave",
       "id": "e97a201c-8b3d-445a-87a6-a41b7e11ae06",
       "type": "displacement",
       "axis_x": 0.01,

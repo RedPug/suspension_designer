@@ -1,14 +1,26 @@
 from uuid import uuid4
 import json
 
-from PySide6.QtCore import (QAbstractItemModel, QModelIndex, QObject, Qt, Signal)
+from PySide6.QtCore import (
+    QAbstractItemModel,
+    QByteArray,
+    QModelIndex,
+    QObject,
+    Qt,
+    Signal,
+)
 from PySide6.QtWidgets import QFileDialog
 
 from src.rendering import Viewport3D
+from src.motion import MotionData, MotionTableWidget
 from src.solver import SolverResult
 from src.structures import SelectionManager
 from src.scene import SceneState
 from src.tree_model import SceneTreeModel
+
+
+DOCK_TREE = "tree"
+DOCK_PROPERTIES = "properties"
 
 
 class Document:
@@ -19,9 +31,10 @@ class Document:
         self.widget = None
         self.id = uuid4()
         self.selection_manager = SelectionManager()
+        self.dock_layout_state: str | None = None
 
     def create_tree_model(self) -> QAbstractItemModel:
-        pass
+        return None
 
     def get_properties(self):
         pass
@@ -29,11 +42,37 @@ class Document:
     def get_menus(self):
         pass
 
+    def required_docks(self) -> tuple[str, ...]:
+        return tuple()
+
+    def set_dock_layout_state(self, state: QByteArray | str | None):
+        if state is None:
+            self.dock_layout_state = None
+            return
+
+        if isinstance(state, QByteArray):
+            self.dock_layout_state = bytes(state.toBase64()).decode("ascii")
+            return
+
+        self.dock_layout_state = state
+
+    def dock_layout_state_bytes(self) -> QByteArray:
+        if not self.dock_layout_state:
+            return QByteArray()
+
+        return QByteArray.fromBase64(self.dock_layout_state.encode("ascii"))
+
     def create_widget(self):
         raise NotImplementedError("Subclasses must implement the create_widget method.")
     
     def _save(self, filepath: str, data: dict, type: str) -> bool:
-        data = {"type": type, "name": self.name, "id": str(self.id), **data}
+        data = {
+            "type": type,
+            "name": self.name,
+            "id": str(self.id),
+            "dock_layout_state": self.dock_layout_state,
+            **data,
+        }
 
         if filepath is None:
             if self.filepath is None:
@@ -74,12 +113,18 @@ class Document:
 
         if type == "editor":
             scene_state = SceneState.from_dict(data)
-            return EditorDocument(name=name, filepath=filepath, scene=scene_state)
+            document = EditorDocument(name=name, filepath=filepath, scene=scene_state)
         elif type == "results":
             solver_result = SolverResult.from_dict(data)
-            return ResultsDocument(name=name, filepath=filepath, solver_result=solver_result)
-        
-        raise ValueError(f"Unknown document type: {type}")
+            document = ResultsDocument(name=name, filepath=filepath, solver_result=solver_result)
+        elif type == "motion":
+            motion_data = data.get("motion_data", data if "variables" in data else {})
+            document = MotionDocument(name=name, filepath=filepath, motion_data=motion_data)
+        else:
+            raise ValueError(f"Unknown document type: {type}")
+
+        document.set_dock_layout_state(data.get("dock_layout_state"))
+        return document
     
 
 class EditorDocument(Document):
@@ -90,6 +135,9 @@ class EditorDocument(Document):
 
     def create_tree_model(self) -> QAbstractItemModel:
         return SceneTreeModel(self)
+
+    def required_docks(self) -> tuple[str, ...]:
+        return (DOCK_TREE, DOCK_PROPERTIES)
 
     def create_widget(self):
         # Create a widget to display the scene
@@ -118,6 +166,34 @@ class ResultsDocument(Document):
         # Implement saving logic for the results document
         self._save(filepath, self.solver_result.to_dict(), type="results")
 
+class MotionDocument(Document):
+    def __init__(self, name: str, filepath: str = None, scene_state: SceneState = None, motion_data: MotionData | dict | None = None):
+        super().__init__(name, filepath)
+        self.scene_state = scene_state
+        if isinstance(motion_data, MotionData):
+            self.motion_data = motion_data
+        else:
+            self.motion_data = MotionData.from_dict(motion_data)
+
+        if self.scene_state is not None and not self.motion_data.variables:
+            self.motion_data = MotionData.from_scene_state(self.scene_state)
+
+    def create_widget(self):
+        self.widget = MotionTableWidget(
+            self.motion_data,
+            scene_state=self.scene_state,
+            selection_manager=self.selection_manager,
+        )
+        return self.widget
+
+    def required_docks(self) -> tuple[str, ...]:
+        return tuple()
+
+    def save(self, filepath: str = None):
+        if self.scene_state is not None:
+            self.motion_data.sync_from_scene_state(self.scene_state)
+
+        self._save(filepath, {"motion_data": self.motion_data.to_dict()}, type="motion")
 
 class DocumentManager(QObject):
     document_added = Signal(Document)

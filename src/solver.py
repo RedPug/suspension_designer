@@ -4,7 +4,7 @@ import numpy as np
 from dataclasses import dataclass
 import time
 
-from model_variables import DisplacementVariable, DistanceVariable
+from src.model_variables import DisplacementVariable, DistanceVariable
 from src.scene import SceneState
 from src.math import get_rotation_matrix_from_quaternion, mult_quaternions
 

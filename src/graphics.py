@@ -1,10 +1,10 @@
-from src.document import Document, DocumentManager
-
 import numpy as np
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt, Signal
 
 from PySide6.QtWidgets import (
+    QApplication,
+    QDockWidget,
     QFileDialog,
     QMainWindow,
     QMenuBar,
@@ -16,12 +16,77 @@ from PySide6.QtWidgets import (
     QStackedWidget
 )
 
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QMouseEvent
+from PySide6.QtCore import QByteArray
 
 from src.structures import EditorNode, NodeGroup, ReferencePlane
-# from src.scene import SceneState
+from src.model_variables import ModelVariableElement
+from src.document import Document, DocumentManager
 from src.rendering import Camera, Viewport3D
 from src.docks import PropertiesDock, TreeDock
+
+# class FluidDragTabBar(QTabBar):
+#     tabSelectionFinalized = Signal(int)
+
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
+#         self.setMovable(True)
+#         self.setChangeCurrentOnDrag(False)
+        
+#         self._drag_start_pos = QPoint()
+#         self._initial_tab_index = -1
+#         self._has_moved = False
+        
+#         self.tabMoved.connect(self._on_tab_moved)
+
+#     def _on_tab_moved(self, from_idx, to_idx):
+#         self._has_moved = True
+#         if self._initial_tab_index == from_idx:
+#             self._initial_tab_index = to_idx
+
+#     def mousePressEvent(self, event: QMouseEvent):
+#         if event.button() == Qt.MouseButton.LeftButton:
+#             self._drag_start_pos = event.position().toPoint()
+#             self._initial_tab_index = self.tabAt(self._drag_start_pos)
+#             self._has_moved = False
+#         super().mousePressEvent(event)
+
+#     def mouseReleaseEvent(self, event: QMouseEvent):
+#         if event.button() == Qt.MouseButton.LeftButton:
+#             clicked_index = self.tabAt(event.position().toPoint())
+            
+#             # Temporarily block signals during the release to ensure 
+#             # external listeners don't form an infinite loop.
+#             self.blockSignals(True)
+#             super().mouseReleaseEvent(event) 
+            
+#             if self._has_moved:
+#                 # Tab moved: force index back to the starting tab's new home
+#                 self.setCurrentIndex(self._initial_tab_index)
+#             else:
+#                 # Pure click: select clicked index
+#                 if clicked_index != -1:
+#                     self.setCurrentIndex(clicked_index)
+            
+#             self.blockSignals(False)
+
+#             # SAFE FIX: Unpolish and repolish the style engine.
+#             # This cleanly resets the CSS :selected pseudo-states 
+#             # without accessing invalid C++ memory pointers.
+#             self.style().unpolish(self)
+#             self.style().polish(self)
+#             self.update()
+            
+#             # Manually emit selection change only if it was a final click
+#             if not self._has_moved and clicked_index != -1:
+#                 self.tabSelectionFinalized.emit(clicked_index)
+
+#             # Reset trackers
+#             self._initial_tab_index = -1
+#             self._has_moved = False
+#             return
+            
+#         super().mouseReleaseEvent(event)
 
 
 class TabBar(QTabBar):
@@ -32,10 +97,11 @@ class TabBar(QTabBar):
         self.document_manager = document_manager
 
         self.setExpanding(False)
-        self.setMovable(True)
         self.setTabsClosable(True)
+
         self.tabCloseRequested.connect(self.close_tab)
         self.currentChanged.connect(self.on_tab_changed)
+        # self.tabSelectionFinalized.connect(self.on_tab_changed)
 
         self.document_manager.document_added.connect(self.on_doc_added)
         self.document_manager.document_removed.connect(self.on_doc_removed)
@@ -102,10 +168,15 @@ class ToolBar(QToolBar):
         # self.plotter.add_text("Result", font_size=10)
 
 class MenuBar(QMenuBar):
-    def __init__(self, parent, docks, document_manager: DocumentManager):
+    def __init__(self, parent, docks: list[QDockWidget], document_manager: DocumentManager):
         super().__init__(parent)
 
+        self.main_window: QMainWindow = parent
         self.document_manager = document_manager
+        self._dock_widgets = {dock.dock_key: dock for dock in docks}
+        self._dock_actions = {}
+        self._active_document: Document | None = None
+        self._restoring_docks = False
 
         self._project_path = None
 
@@ -126,9 +197,16 @@ class MenuBar(QMenuBar):
 
         dock_menu = view_menu.addMenu("Docks")
         # actions
-        for widget in docks:
-            toggle_action = widget.toggleViewAction()
+        for dock in docks:
+            toggle_action = dock.toggleViewAction()
+            self._dock_actions[dock.dock_key] = toggle_action
             dock_menu.addAction(toggle_action)
+
+            dock.visibilityChanged.connect(self._on_dock_visibility_changed)
+            dock.dockLocationChanged.connect(self._on_dock_location_changed)
+
+        self.document_manager.selection_changed.connect(self.sync_docks)
+        self.sync_docks(self.document_manager.current_document)
 
         view_menu.addSeparator()
 
@@ -153,6 +231,7 @@ class MenuBar(QMenuBar):
         add_menu.addAction("Node").triggered.connect(lambda: self.add_node())
         add_menu.addAction("Plane").triggered.connect(lambda: self.add_reference_plane())
         add_menu.addAction("Group").triggered.connect(lambda: self.add_group())
+        add_menu.addAction("Variable").triggered.connect(lambda: self.add_model_variable())
 
 
         solve_menu = self.addMenu("Solve")
@@ -164,6 +243,43 @@ class MenuBar(QMenuBar):
     def save_scene(self):
         self.document_manager.s
         pass
+
+    def sync_docks(self, document: Document | None):
+        self._save_active_dock_state()
+        self._active_document = document
+
+        required_docks = set(document.required_docks()) if document is not None else set()
+
+        self._restoring_docks = True
+
+        for dock_key, dock in self._dock_widgets.items():
+            allowed = dock_key in required_docks
+            dock.setVisible(allowed)
+
+            action = self._dock_actions.get(dock_key)
+            if action is not None:
+                action.setEnabled(allowed)
+                action.setVisible(allowed)
+
+        if document is not None and document.dock_layout_state:
+            self.main_window.restoreState(document.dock_layout_state_bytes())
+
+        self._restoring_docks = False
+
+    def _save_active_dock_state(self):
+        if self._restoring_docks:
+            return
+
+        if self._active_document is None:
+            return
+
+        self._active_document.set_dock_layout_state(self.main_window.saveState())
+
+    def _on_dock_visibility_changed(self, _visible: bool):
+        self._save_active_dock_state()
+
+    def _on_dock_location_changed(self, *args):
+        self._save_active_dock_state()
 
     def load_scene(self):
         pass
@@ -182,6 +298,11 @@ class MenuBar(QMenuBar):
 
     def add_group(self):
         self.document_manager.current_document.scene_state.add_group(NodeGroup(name="New Group", nodes=[]))
+
+    def add_model_variable(self):
+        self.document_manager.current_document.scene_state.add_model_variable(ModelVariableElement())
+
+
 
     def solve_system(self):
         print("Solving system...")
@@ -241,6 +362,9 @@ class MainWindow(QMainWindow):
 
         self.property_dock = PropertiesDock(self, document_manager=self.document_manager)
         self.addDockWidget(Qt.RightDockWidgetArea, self.property_dock)
+
+        self.tree_dock.hide()
+        self.property_dock.hide()
 
         # self.toolbar = ToolBar(self)
         # self.addToolBar(self.toolbar)

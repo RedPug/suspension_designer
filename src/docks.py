@@ -20,13 +20,21 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtGui import QBrush, QColor
 
-from src.properties import Property
-from src.document import Document, DocumentManager, EditorDocument
+from src.properties import GroupEditor, Property
+from src.document import (
+    DOCK_PROPERTIES,
+    DOCK_TREE,
+    Document,
+    DocumentManager,
+    EditorDocument,
+)
 
 class TreeDock(QDockWidget):
+    dock_key = DOCK_TREE
     
     def __init__(self, parent, document_manager: DocumentManager):
         super().__init__("Tree", parent)
+        self.setObjectName("treeDock")
 
         self.document_manager = document_manager
         self._scene_state_changed = None
@@ -72,6 +80,9 @@ class TreeDock(QDockWidget):
 
         self.tree.setModel(document.create_tree_model())
 
+        if self.tree.model() is None:
+            return
+
         self.tree.selectionModel().selectionChanged.connect(
             self._onSelectionChanged
         )
@@ -94,6 +105,9 @@ class TreeDock(QDockWidget):
         if document is None:
             self.tree.setModel(None)
             return
+        
+        if self.tree.model() is None:
+            return
 
         self.tree.setModel(document.create_tree_model())
 
@@ -106,6 +120,8 @@ class TreeDock(QDockWidget):
         self.restoreSelection()
 
     def restoreSelection(self):
+        if self.tree.model() is None:
+            return
 
         selected = self.document_manager.current_document.selection_manager.get_selected()
 
@@ -122,6 +138,9 @@ class TreeDock(QDockWidget):
 
 
     def findIndexForObject(self, obj, parent=QModelIndex()):
+        if self.tree.model() is None:
+            return QModelIndex()
+        
         model = self.tree.model()
 
         for row in range(model.rowCount(parent)):
@@ -154,6 +173,7 @@ class TreeDock(QDockWidget):
 
 
 class PropertiesDock(QDockWidget):
+    dock_key = DOCK_PROPERTIES
 
     def __init__(
         self,
@@ -161,6 +181,7 @@ class PropertiesDock(QDockWidget):
         document_manager: DocumentManager,
     ):
         super().__init__("Properties", parent)
+        self.setObjectName("propertiesDock")
 
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 

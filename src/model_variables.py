@@ -10,8 +10,11 @@ from src.structures import EditorNode
 class ModelVariableElement(QObject):
     did_change = Signal()
 
-    def __init__(self, model_variable:'ModelVariable'):
+    def __init__(self, model_variable:'ModelVariable' = None):
         super().__init__()
+
+        if model_variable is None:
+            model_variable = DisplacementVariable(name="New Variable")
 
         self._variable: ModelVariable = model_variable
         self._variable.did_change.connect(self.did_change.emit)
@@ -178,6 +181,9 @@ class DisplacementVariable(ModelVariable):
 
     def get_displacement(self, mag: float) -> np.ndarray:
         return mag * np.array([self.axis_x, self.axis_y, self.axis_z])
+    
+    def evaluate(self) -> float:
+        return 0.1
 
     def get_property_list(self) -> dict[str, list[Property]]:
         return super().get_property_list() | {

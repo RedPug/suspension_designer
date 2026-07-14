@@ -3,4 +3,4 @@ __pycache__/
 build/
 dist/
 venv/
-user_settings.json
+user_data/

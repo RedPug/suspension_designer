@@ -12,6 +12,7 @@ from src.graphics import MainWindow
 from PySide6.QtWidgets import QApplication
 import matplotlib.pyplot as plt
 # from src.math import mult_quaternions, get_rotation_matrix_from_quaternion
+from src.document import MotionDocument
 
 # system_state = SolverState(groups=[chassis_group, upright_group, upper_group, lower_group], linkages=linkages1)
 nodes = np.array([
@@ -44,11 +45,11 @@ window = MainWindow()
 window.resize(900, 600)
 window.show()
 
-if not os.path.exists("./user_settings.json"):
-    with open("./user_settings.json", "w") as f:
+if not os.path.exists("./user_data/user_settings.json"):
+    with open("./user_data/user_settings.json", "w") as f:
         json.dump({}, f)
 
-with open("./user_settings.json", "r") as f:
+with open("./user_data/user_settings.json", "r") as f:
     user_settings = json.load(f)
 
 if user_settings.get("last_opened_files"):
@@ -62,6 +63,26 @@ if user_settings.get("last_opened_files"):
         print(f"Loading last opened file: {file}")
         doc = Document.load(file)
         window.document_manager.add_document(doc, select=True)
+
+
+def open_motion_document_from_default_editor(window: MainWindow):
+    editor_document = next(
+        (doc for doc in window.document_manager._documents if isinstance(doc, EditorDocument)),
+        None,
+    )
+
+    if editor_document is None:
+        print("No editor document available to create a motion document from.")
+        return
+
+    motion_document = MotionDocument(
+        name=f"{editor_document.name} Motion",
+        scene_state=editor_document.scene_state,
+    )
+    window.document_manager.add_document(motion_document, select=True)
+
+
+open_motion_document_from_default_editor(window)
 
 # doc = Document.load("C:\\Users\\thero\\Downloads\\test4.proj")
 # window.document_manager.add_document(doc, select=True)
