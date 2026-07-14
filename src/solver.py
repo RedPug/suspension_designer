@@ -6,6 +6,7 @@ import time
 
 from src.model_variables import DisplacementVariable, DistanceVariable
 from src.scene import SceneState
+from src.motion import MotionVariableData
 from src.math import get_rotation_matrix_from_quaternion, mult_quaternions
 
 
@@ -169,10 +170,10 @@ class Linkage:
 
 
 class SolverState:
-    def __init__(self, groups: list[RigidGroup], linkages: list[Linkage], displacements: list[tuple[Node, tuple[float, float, float]]] = []):
+    def __init__(self, groups: list[RigidGroup], linkages: list[Linkage], displacements: list[tuple[Node, np.ndarray, np.ndarray]] = []):
         self.groups = groups
         self.linkages = linkages
-        self.displacements = displacements  # List of tuples (Node, displacement_vector)
+        self.displacements = displacements  # List of tuples (Node, initial, delta)
 
     # def get_node_by_id(self, node_id: int) -> Optional[Node]:
     #     for group in self.groups:
@@ -214,7 +215,7 @@ class SolverState:
                     'node_id': node.id,
                     'displacement': delta.tolist()
                 }
-                for node, delta in self.displacements
+                for node, initial, delta in self.displacements
             ]
         }
     
@@ -293,18 +294,18 @@ class SolverState:
             )
             linkage_copy.append(new_linkage)
 
-        displacement_copy = [(node_mapping[node], np.copy(pos)) for node, pos in self.displacements]
+        displacement_copy = [(node_mapping[node], np.copy(pos), np.copy(disp)) for node, pos, disp in self.displacements]
 
         return SolverState(groups=group_copy, linkages=linkage_copy, displacements=displacement_copy)
 
     @staticmethod
-    def from_connections(nodes: np.ndarray, node_groups: list[list[int]], displacements: list[tuple[int, list[float]]], extra_links: list[tuple[int, int, float]]) -> 'SolverState':
+    def from_connections(nodes: np.ndarray, node_groups: list[list[int]], displacements: list[tuple[int, np.ndarray]], extra_links: list[tuple[int, int, float]]) -> 'SolverState':
         """Utility function to create a system state from a list of nodes and their connections.
 
         Args:
             nodes (np.ndarray): An array of Node objects with global positions defined.
             node_groups (List[List[int]]): A list of lists, where each list contains the indices of nodes that belong to the same group.
-            displacements (List[Tuple[int, List[float]]]): A list of tuples, where each tuple contains a node index and a list of displacement values.
+            displacements (List[Tuple[int, np.ndarray]]): A list of tuples, where each tuple contains a node index and an array of displacement values.
             extra_links (List[Tuple[int, int, float]]): A list of tuples, where each tuple contains two node indices and a target distance.
 
         Returns:
@@ -351,39 +352,43 @@ class SolverState:
                 linkages.append(Linkage(name=f"linkage_{len(linkages)}", node1=duplicate_nodes[node1_idx][0], node2=duplicate_nodes[node2_idx][0], target_distance=target_distance))
 
 
-        disp: list[tuple[Node, tuple[float, float, float]]] = []
+        disp: list[tuple[Node, np.ndarray, np.ndarray]] = []
         for node_idx, delta in displacements:
+            
             if node_idx < 0 or node_idx >= len(duplicate_nodes):
                 print(f"Warning: Displacement references invalid node index {node_idx}. Skipping.")
                 continue
-            for node in duplicate_nodes[node_idx]:
-                node_pos = node.get_world_position()
-                target_pos = [None, None, None]
-                if delta[0] is not None:
-                    target_pos[0] = delta[0] + node_pos[0]
-                if delta[1] is not None:
-                    target_pos[1] = delta[1] + node_pos[1]
-                if delta[2] is not None:
-                    target_pos[2] = delta[2] + node_pos[2]
-
-                disp.append((node, tuple(target_pos)))
-
-        
+            # for node in duplicate_nodes[node_idx]:
+            delta = np.array(delta)
+            node = duplicate_nodes[node_idx][0]
+            node_pos = node.get_world_position()
+            disp.append((node, node_pos, delta))
 
         return SolverState(groups=groups, linkages=linkages, displacements=disp)
 
 
 def _apply_linkages(system_state: SolverState, easing_factor, max_iterations, epsilon, rotation_strength):
     """Recompute the positions of all linkages based on their connected nodes."""
-
+    print("applying linkages with displacements:", system_state.displacements)
     did_converge = False
     errors = []
 
     iterations = 0
     while iterations < max_iterations:
-        easing_factor = max(0.1, easing_factor * (1 - iterations/max_iterations))  # Optional: decay easing factor over iterations
         iterations += 1
         error = 0.0
+
+        # apply displacements
+        for node, start, disp in system_state.displacements:
+            node_pos = node.get_world_position()
+            total_delta = start + disp - node_pos
+            disp_dir = disp / np.linalg.norm(disp) if np.linalg.norm(disp) > 1e-8 else np.array([0.0, 0.0, 0.0])
+            
+            correction = disp_dir * np.dot(total_delta, disp_dir)
+
+            node.parent_group.drag_by_local_point(node.local_position, correction*easing_factor, rotation_strength=rotation_strength)
+
+            error = max(error, np.linalg.norm(correction))
 
         # apply linkages
         for linkage in system_state.linkages:
@@ -395,6 +400,7 @@ def _apply_linkages(system_state: SolverState, easing_factor, max_iterations, ep
                 print(f"Warning: Both nodes in linkage {linkage.name} are static. Skipping correction.")
                 continue
 
+
             if n1.parent_group.is_static:
                 n2.parent_group.drag_by_local_point(n2.local_position, correction*easing_factor, rotation_strength=rotation_strength)
             elif n2.parent_group.is_static:
@@ -404,21 +410,6 @@ def _apply_linkages(system_state: SolverState, easing_factor, max_iterations, ep
                 n2.parent_group.drag_by_local_point(n2.local_position, correction*0.5*easing_factor, rotation_strength=rotation_strength)
 
             error = max(error, np.linalg.norm(correction))
-
-        # apply displacements
-        for node, pos in system_state.displacements:
-            node_pos = node.get_world_position()
-            delta = np.array([0.0, 0.0, 0.0])
-            if pos[0] is not None:
-                delta += np.array([pos[0] - node_pos[0], 0.0, 0.0])
-            if pos[1] is not None:
-                delta += np.array([0.0, pos[1] - node_pos[1], 0.0])
-            if pos[2] is not None:
-                delta += np.array([0.0, 0.0, pos[2] - node_pos[2]])
-
-            node.parent_group.drag_by_local_point(node.local_position, delta*easing_factor, rotation_strength=rotation_strength)
-
-            error = max(error, np.linalg.norm(delta))
 
 
         errors.append(error)
@@ -431,7 +422,7 @@ def _apply_linkages(system_state: SolverState, easing_factor, max_iterations, ep
     # print(f"Reached max iterations with error: {error:.6f}")
     return np.array(errors), iterations, did_converge
 
-def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=1000, epsilon=(1e-10)/2, rotation_strength=0.5)-> SolverResult:
+def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=1000, epsilon=(1e-5)/2, rotation_strength=0.5)-> SolverResult:
     """Iteratively solve for the positions of all groups based on the linkage constraints.
 
     Args:
@@ -453,7 +444,7 @@ def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=10
     return SolverResult(system_state=system_copy, error=errors[-1], errors=errors, iterations=iterations, time=t1-t0, did_converge=did_converge)
 
 
-def solve(scene_state: SceneState, **kwargs) -> SolverResult:
+def solve(scene_state: SceneState, motion_variables: list[MotionVariableData], t: float = 0.0, **kwargs) -> SolverResult:
     current_state = scene_state
 
     nodes = np.array([n.world_position for n in current_state.nodes])
@@ -461,20 +452,48 @@ def solve(scene_state: SceneState, **kwargs) -> SolverResult:
     groups = [[current_state.nodes.index(n) for n in group.nodes] for group in current_state.groups]
 
     displacements: list[tuple[int, np.ndarray]] = []
-    for variable in current_state.model_variables:
+    motion_variables_by_id = {variable.id: variable for variable in motion_variables}
+
+    print("model_variables:", current_state.model_variables)
+
+    for element in current_state.model_variables:
+        variable = element.variable
+
+        motion_variable = motion_variables_by_id.get(str(variable.id))
+        if motion_variable is None or not motion_variable.is_input:
+            continue
+
+        sampled_value = motion_variable.sample_at(t)
+        if sampled_value is None:
+            print(f"Skipping variable {variable.name} at time {t} because it has no sampled value.")
+            continue
+
         if isinstance(variable, DisplacementVariable):
             node = variable.node
             if node is not None:
-                displacements.append((current_state.nodes.index(node), variable.get_displacement(0.1)))
-
+                displacements.append((current_state.nodes.index(node), variable.get_displacement(sampled_value)))
+            
+            else:
+                print(f"Skipping variable {variable.name} at time {t} because its node is None.")
+    
     links: list[Linkage] = []
     for variable in current_state.model_variables:
+        motion_variable = motion_variables_by_id.get(str(variable.id))
+        if motion_variable is None or not motion_variable.is_input:
+            continue
+
+        sampled_value = motion_variable.sample_at(t)
+        if sampled_value is None:
+            print(f"Skipping variable {variable.name} at time {t} because it has no sampled value.")
+            continue
+
         if isinstance(variable, DistanceVariable):
             node1 = current_state.nodes.index(variable.node1)
             node2 = current_state.nodes.index(variable.node2)
             if node1 is not None and node2 is not None:
-                links.append((node1, node2, 0.1))
+                links.append((node1, node2, sampled_value))
 
+    print("about to run solver with displacements:", displacements)
     solver_state = SolverState.from_connections(
         nodes=nodes,
         node_groups=groups,

@@ -1,5 +1,8 @@
 from uuid import uuid4
 import json
+import os
+
+import numpy as np
 
 from PySide6.QtCore import (
     QAbstractItemModel,
@@ -13,7 +16,7 @@ from PySide6.QtWidgets import QFileDialog
 
 from src.rendering import Viewport3D
 from src.motion import MotionData, MotionTableWidget
-from src.solver import SolverResult
+from src.solver import SolverResult, solve
 from src.structures import SelectionManager
 from src.scene import SceneState
 from src.tree_model import SceneTreeModel
@@ -29,6 +32,7 @@ class Document:
         self.has_changed = False
         self.filepath = filepath
         self.widget = None
+        self.document_manager = None
         self.id = uuid4()
         self.selection_manager = SelectionManager()
         self.dock_layout_state: str | None = None
@@ -70,7 +74,6 @@ class Document:
             "type": type,
             "name": self.name,
             "id": str(self.id),
-            "dock_layout_state": self.dock_layout_state,
             **data,
         }
 
@@ -119,11 +122,15 @@ class Document:
             document = ResultsDocument(name=name, filepath=filepath, solver_result=solver_result)
         elif type == "motion":
             motion_data = data.get("motion_data", data if "variables" in data else {})
-            document = MotionDocument(name=name, filepath=filepath, motion_data=motion_data)
+            document = MotionDocument(
+                name=name,
+                filepath=filepath,
+                motion_data=motion_data,
+                editor_filepath=data.get("editor_filepath"),
+            )
         else:
             raise ValueError(f"Unknown document type: {type}")
 
-        document.set_dock_layout_state(data.get("dock_layout_state"))
         return document
     
 
@@ -167,9 +174,10 @@ class ResultsDocument(Document):
         self._save(filepath, self.solver_result.to_dict(), type="results")
 
 class MotionDocument(Document):
-    def __init__(self, name: str, filepath: str = None, scene_state: SceneState = None, motion_data: MotionData | dict | None = None):
+    def __init__(self, name: str, filepath: str = None, scene_state: SceneState = None, motion_data: MotionData | dict | None = None, editor_filepath: str | None = None):
         super().__init__(name, filepath)
         self.scene_state = scene_state
+        self.editor_filepath = editor_filepath
         if isinstance(motion_data, MotionData):
             self.motion_data = motion_data
         else:
@@ -178,11 +186,69 @@ class MotionDocument(Document):
         if self.scene_state is not None and not self.motion_data.variables:
             self.motion_data = MotionData.from_scene_state(self.scene_state)
 
+    def _build_solved_scene_state(self, result: SolverResult) -> SceneState:
+        solved_scene = SceneState.from_dict(self.scene_state.to_dict())
+        solved_scene.is_editable = False
+
+        positions_by_index: dict[int, list[np.ndarray]] = {}
+        for group in result.system_state.groups:
+            for node in group.nodes:
+                positions_by_index.setdefault(node.index, []).append(np.array(node.get_world_position(), dtype=float))
+
+        for node_index, positions in positions_by_index.items():
+            if 0 <= node_index < len(solved_scene.nodes):
+                solved_scene.nodes[node_index].world_position = np.mean(positions, axis=0)
+
+        return solved_scene
+
+    def solve_into_editor_document(self):
+        if self.scene_state is None:
+            print("No scene state available to solve.")
+            return None
+
+        if self.document_manager is None:
+            print("Motion document is not attached to a document manager.")
+            return None
+
+        self.motion_data.sync_from_scene_state(self.scene_state)
+
+        # try:
+        result = solve(self.scene_state, self.motion_data.variables, t=0.0)
+        # except Exception as error:
+        #     print(f"Failed to solve motion document: {error}")
+        #     return None
+
+        solved_scene = self._build_solved_scene_state(result)
+        solved_document = EditorDocument(
+            name=f"{self.name} Solved",
+            scene=solved_scene,
+        )
+        solved_document.scene_state.is_editable = False
+
+        self.document_manager.add_document(solved_document, select=True)
+        return solved_document
+
+    def sync_from_editor_document(self, editor_document: EditorDocument | None):
+        if editor_document is None:
+            return
+
+        self.scene_state = editor_document.scene_state
+        if self.scene_state is not None:
+            self.motion_data.sync_from_scene_state(self.scene_state)
+
+        if self.widget is not None:
+            if hasattr(self.widget, "set_scene_state"):
+                self.widget.set_scene_state(self.scene_state)
+            else:
+                self.widget.scene_state = self.scene_state
+                self.widget.refresh()
+
     def create_widget(self):
         self.widget = MotionTableWidget(
             self.motion_data,
             scene_state=self.scene_state,
             selection_manager=self.selection_manager,
+            solve_callback=self.solve_into_editor_document,
         )
         return self.widget
 
@@ -193,7 +259,14 @@ class MotionDocument(Document):
         if self.scene_state is not None:
             self.motion_data.sync_from_scene_state(self.scene_state)
 
-        self._save(filepath, {"motion_data": self.motion_data.to_dict()}, type="motion")
+        self._save(
+            filepath,
+            {
+                "motion_data": self.motion_data.to_dict(),
+                "editor_filepath": self.editor_filepath,
+            },
+            type="motion",
+        )
 
 class DocumentManager(QObject):
     document_added = Signal(Document)
@@ -214,12 +287,34 @@ class DocumentManager(QObject):
             return self._documents[self.selected_doc_index]
         return None
 
+    def get_document_by_filepath(self, filepath: str):
+        if not filepath:
+            return None
+
+        normalized_target = os.path.normcase(os.path.abspath(filepath))
+
+        for document in self._documents:
+            if not document.filepath:
+                continue
+
+            normalized_document_path = os.path.normcase(os.path.abspath(document.filepath))
+            if normalized_document_path == normalized_target:
+                return document
+
+        return None
+
     def select_document(self, doc: Document):
         if doc is None:
             self.selected_doc_index = None
             self.selection_changed.emit(None)
         elif doc in self._documents:
             self.selected_doc_index = self._documents.index(doc)
+
+            if isinstance(doc, MotionDocument):
+                source_document = self.get_document_by_filepath(doc.editor_filepath)
+                if isinstance(source_document, EditorDocument):
+                    doc.sync_from_editor_document(source_document)
+
             self.selection_changed.emit(doc)
         else:
             raise ValueError("Document not found in the manager.")
@@ -273,6 +368,7 @@ class DocumentManager(QObject):
         raise IndexError("Document index out of range.")
 
     def add_document(self, document: Document, select=False):
+        document.document_manager = self
         self._documents.append(document)
         self.document_added.emit(document)
         if select:
@@ -284,6 +380,8 @@ class DocumentManager(QObject):
         
         self._documents.remove(document)
         self.document_removed.emit(document)
+
+        document.document_manager = None
 
         if len(self._documents) > 0:
             self.select_document(self._documents[min(self.selected_doc_index, len(self._documents)-1)])

@@ -78,11 +78,12 @@ def open_motion_document_from_default_editor(window: MainWindow):
     motion_document = MotionDocument(
         name=f"{editor_document.name} Motion",
         scene_state=editor_document.scene_state,
+        editor_filepath=editor_document.filepath,
     )
     window.document_manager.add_document(motion_document, select=True)
 
 
-open_motion_document_from_default_editor(window)
+# open_motion_document_from_default_editor(window)
 
 # doc = Document.load("C:\\Users\\thero\\Downloads\\test4.proj")
 # window.document_manager.add_document(doc, select=True)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 	QHeaderView,
 	QHBoxLayout,
 	QLabel,
+	QPushButton,
 	QSplitter,
 	QTableWidget,
 	QTableWidgetItem,
@@ -96,6 +97,30 @@ class MotionVariableData:
 			"points": [point.to_dict() for point in self.points],
 		}
 
+	def sample_at(self, t: float = 0.0) -> Optional[float]:
+		if self.points:
+			ordered_points = sorted(self.points, key=lambda point: point.step)
+
+			if t <= ordered_points[0].step:
+				return ordered_points[0].value
+
+			if t >= ordered_points[-1].step:
+				return ordered_points[-1].value
+
+			for left_point, right_point in zip(ordered_points, ordered_points[1:]):
+				if left_point.step <= t <= right_point.step:
+					if left_point.value is None or right_point.value is None:
+						return None
+
+					span = right_point.step - left_point.step
+					if span == 0:
+						return right_point.value
+
+					blend = (t - left_point.step) / span
+					return left_point.value + (right_point.value - left_point.value) * blend
+
+		return self.value
+
 
 class MotionData:
 	def __init__(self, variables: list[MotionVariableData] | None = None):
@@ -145,6 +170,12 @@ class MotionData:
 
 		self.variables = synced_variables
 
+	def get_variable_by_id(self, variable_id: str) -> MotionVariableData | None:
+		for variable in self.variables:
+			if variable.id == str(variable_id):
+				return variable
+		return None
+
 
 class MotionTrendCanvas(FigureCanvas):
 	def __init__(self, parent=None):
@@ -192,6 +223,7 @@ class MotionTableWidget(QWidget):
 		motion_data: MotionData,
 		scene_state: SceneState | None = None,
 		selection_manager=None,
+		solve_callback: Callable[[], None] | None = None,
 		parent=None,
 	):
 		super().__init__(parent)
@@ -199,12 +231,23 @@ class MotionTableWidget(QWidget):
 		self.motion_data = motion_data
 		self.scene_state = scene_state
 		self.selection_manager = selection_manager
+		self.solve_callback = solve_callback
 		self._updating_variable_table = False
 		self._updating_step_table = False
+		self._scene_state_connection = None
 
-		main_layout = QHBoxLayout(self)
+		main_layout = QVBoxLayout(self)
 		main_layout.setContentsMargins(0, 0, 0, 0)
-		main_layout.setSpacing(0)
+		main_layout.setSpacing(8)
+
+		button_row = QHBoxLayout()
+		button_row.setContentsMargins(12, 12, 12, 0)
+		button_row.addStretch(1)
+
+		self.solve_button = QPushButton("Solve")
+		self.solve_button.clicked.connect(self._on_solve_clicked)
+		button_row.addWidget(self.solve_button)
+		main_layout.addLayout(button_row)
 
 		splitter = QSplitter(Qt.Horizontal, self)
 		splitter.setChildrenCollapsible(False)
@@ -260,9 +303,35 @@ class MotionTableWidget(QWidget):
 
 		if self.scene_state is not None:
 			self.scene_state.scene_changed.connect(self.refresh)
+			self._scene_state_connection = self.scene_state.scene_changed
 
 		if self.selection_manager is not None:
 			self.selection_manager.selection_changed.connect(self._on_selection_manager_changed)
+
+		self.refresh()
+
+	def _on_solve_clicked(self):
+		if self.solve_callback is None:
+			return
+
+		self.solve_callback()
+
+	def set_scene_state(self, scene_state: SceneState | None):
+		if self.scene_state is scene_state:
+			return
+
+		if self._scene_state_connection is not None:
+			try:
+				self._scene_state_connection.disconnect(self.refresh)
+			except Exception:
+				pass
+			self._scene_state_connection = None
+
+		self.scene_state = scene_state
+
+		if self.scene_state is not None:
+			self.scene_state.scene_changed.connect(self.refresh)
+			self._scene_state_connection = self.scene_state.scene_changed
 
 		self.refresh()
 

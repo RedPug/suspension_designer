@@ -39,6 +39,7 @@ class ModelVariableElement(QObject):
     def variable(self, value):
         if not isinstance(value, ModelVariable):
             raise ValueError("variable must be an instance of ModelVariable")
+        
         if self._variable is not None:
             self._variable.did_change.disconnect(self.did_change.emit)
 
@@ -54,6 +55,13 @@ class ModelVariableElement(QObject):
             return self._variable.get_subselections()
         return []
     
+    def __set_variable_type(self, type):
+        if not issubclass(type, ModelVariable):
+            raise ValueError("type must be a subclass of ModelVariable")
+
+        new_variable = type(name=self._variable.name, id=self._variable.id)
+        self.variable = new_variable
+    
     def get_property_list(self) -> dict[str, list[Property]]:
         return {
             "Info": [
@@ -68,7 +76,7 @@ class ModelVariableElement(QObject):
                 ),
                 Property("Type",
                     get=lambda _: self._variable.__class__,
-                    set=lambda v, _: setattr(self, 'variable', v(name=self._variable.name, id=self._variable.id)),
+                    set=lambda v, _: self.__set_variable_type(v),
                     type=DropdownPropertyType(
                         options_callback=lambda _: {"Displacement": DisplacementVariable, "Distance": DistanceVariable}
                     )
@@ -183,7 +191,7 @@ class DisplacementVariable(ModelVariable):
         return mag * np.array([self.axis_x, self.axis_y, self.axis_z])
     
     def evaluate(self) -> float:
-        return 0.1
+        return 0.0
 
     def get_property_list(self) -> dict[str, list[Property]]:
         return super().get_property_list() | {
@@ -276,6 +284,9 @@ class DistanceVariable(ModelVariable):
     def node_b(self, value):
         self._node_b = value
         self.did_change.emit()
+
+    def evaluate(self) -> float:
+        return np.linalg.norm(self.node_a.world_position - self.node_b.world_position)
 
 
     def get_property_list(self) -> dict[str, list[Property]]:
