@@ -181,17 +181,23 @@ class MenuBar(QMenuBar):
         self._project_path = None
 
         file_menu = self.addMenu("File")
+
+        new_menu = file_menu.addMenu("New")
+
+        new_editor_action = new_menu.addAction("Geometry Editor")
+        new_editor_action.triggered.connect(lambda: self.document_manager.create_new_editor_document())
+        new_motion_action = new_menu.addAction("Motion")
+        new_motion_action.triggered.connect(lambda: self.document_manager.create_new_motion_document())
+
         save_action = file_menu.addAction("Save")
         save_action.triggered.connect(self.document_manager.save_current)
-
         save_as_action = file_menu.addAction("Save as")
         save_as_action.triggered.connect(self.document_manager.save_current_as)
-
         save_all_action = file_menu.addAction("Save All")
         save_all_action.triggered.connect(self.document_manager.save_all)
-
         load_action = file_menu.addAction("Load")
         load_action.triggered.connect(self.document_manager.load)
+
 
         view_menu = self.addMenu("View")
 

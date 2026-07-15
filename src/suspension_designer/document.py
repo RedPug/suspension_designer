@@ -137,7 +137,7 @@ class Document:
 class EditorDocument(Document):
     def __init__(self, name: str, filepath: str = None, scene: SceneState = None):
         super().__init__(name, filepath)
-        self.scene_state = scene
+        self.scene_state = scene if scene is not None else SceneState()
         self.viewport = None
 
     def create_tree_model(self) -> QAbstractItemModel:
@@ -277,7 +277,7 @@ class MotionDocument(Document):
         return self.widget
 
     def required_docks(self) -> tuple[str, ...]:
-        return tuple()
+        return (DOCK_TREE, DOCK_PROPERTIES)
 
     def save(self, filepath: str = None):
         if self.scene_state is not None:
@@ -415,3 +415,25 @@ class DocumentManager(QObject):
         if document.widget is not None:
             document.widget.deleteLater()  # Ensure the widget is properly deleted
             document.widget = None  # Clear the reference to the widget
+
+    def create_new_editor_document(self, name: str = "New Document"):
+        new_doc = EditorDocument(name=name)
+        self.add_document(new_doc, select=True)
+    
+    def create_new_motion_document(self):
+        if self.current_document is not None and isinstance(self.current_document, EditorDocument):
+            editor_doc = self.current_document
+        else:
+            editor_doc = next((doc for doc in self._documents if isinstance(doc, EditorDocument)), None)
+
+        if editor_doc is None:
+            print("No editor document available to create a motion document from.")
+            return
+
+        motion_document = MotionDocument(
+        name=f"{editor_doc.name} Motion",
+        scene_state=editor_doc.scene_state,
+        editor_filepath=editor_doc.filepath,
+        )
+
+        self.add_document(motion_document, select=True)
