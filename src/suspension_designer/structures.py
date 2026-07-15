@@ -169,9 +169,8 @@ class ReferencePlane(QObject):
         CONTAINING = auto()
         PERPENDICULAR = auto()
 
-    def __init__(self, p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, mode: 'ReferencePlane.Mode', name: str = "Unnamed", id: UUID = None):
+    def __init__(self, name: str = "Unnamed", *, id: UUID = None, mode: 'ReferencePlane.Mode', p0: EditorNode = None, p1: EditorNode = None, p2: EditorNode = None):
         super().__init__()
-        
         
         self._name = name
         self.id = id if id is not None else uuid4()
@@ -184,18 +183,23 @@ class ReferencePlane(QObject):
         self._rebuild()
 
     def _rebuild(self):
+        if self.p0 is None or self._p1 is None or self._p2 is None:
+            self._point = None
+            self._normal = None
+            return
+        
         if self.mode == ReferencePlane.Mode.CONTAINING:
             # Recreate a plane containing the three points
-            v1 = self._p1 - self._p0
-            v2 = self._p2 - self._p0
+            v1 = self._p1.world_position - self._p0.world_position
+            v2 = self._p2.world_position - self._p0.world_position
             normal = np.cross(v1, v2)
             normal /= np.linalg.norm(normal)
-            point = self._p0
+            point = self._p0.world_position
         elif self.mode == ReferencePlane.Mode.PERPENDICULAR:
             # Recreate a plane perpendicular to the vector from p0 to p1, passing through p2
-            v = self._p1 - self._p0
+            v = self._p1.world_position - self._p0.world_position
             normal = v / np.linalg.norm(v)
-            point = self._p2
+            point = self._p2.world_position
         else:
             print(f"Unknown mode: {self.mode}")
             raise ValueError("Invalid mode. Must be 'containing' or 'perpendicular'.")
@@ -270,6 +274,9 @@ class ReferencePlane(QObject):
         self._rebuild()
 
     def constrain_point(self, point: np.ndarray, ignore_direction: np.ndarray = None) -> np.ndarray:
+        if self._point is None or self._normal is None:
+            return point
+
         # Project the point onto the plane
         d = np.dot(point - self.point, self.normal)
 
@@ -309,49 +316,44 @@ class ReferencePlane(QObject):
         t = np.dot(A - p0, v) / np.dot(v, v)
         return p0 + t * v
     
+    def get_subselections(self) -> list[EditorNode]:
+        return [self.p0, self.p1, self.p2]
+    
     def get_property_list(self) -> dict[str, list[Property]]:
         return {
             "Info":[
                 Property("ID", get=lambda _: self.id, type=StringPropertyType()),
                 Property("Name", get=lambda _: self.name, set=lambda name, _: setattr(self, 'name', name), type=StringPropertyType()),
-                Property("Center X", get=lambda _: self.point[0], type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Center Y", get=lambda _: self.point[1], type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Center Z", get=lambda _: self.point[2], type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Normal X", get=lambda _: self.normal[0], type=NumberPropertyType(multiplier=1, decimals=2)),
-                Property("Normal Y", get=lambda _: self.normal[1], type=NumberPropertyType(multiplier=1, decimals=2)),
-                Property("Normal Z", get=lambda _: self.normal[2], type=NumberPropertyType(multiplier=1, decimals=2)),
+                Property("Center X", get=lambda _: self.point[0] if self.point is not None else None, type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
+                Property("Center Y", get=lambda _: self.point[1] if self.point is not None else None, type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
+                Property("Center Z", get=lambda _: self.point[2] if self.point is not None else None, type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
+                Property("Normal X", get=lambda _: self.normal[0] if self.normal is not None else None, type=NumberPropertyType(multiplier=1, decimals=2)),
+                Property("Normal Y", get=lambda _: self.normal[1] if self.normal is not None else None, type=NumberPropertyType(multiplier=1, decimals=2)),
+                Property("Normal Z", get=lambda _: self.normal[2] if self.normal is not None else None, type=NumberPropertyType(multiplier=1, decimals=2)),
             ],
             "Transform":[
                 Property("Mode", get=lambda _: self.mode, set=lambda mode, _: setattr(self, 'mode', mode), type=DropdownPropertyType(options_callback=lambda _: {"Containing":ReferencePlane.Mode.CONTAINING, "Perpendicular":ReferencePlane.Mode.PERPENDICULAR}, tooltips=["Plane contains all 3 points", "Plane is perpendicular to P0 -> P1, and contains P2"])),
 
-                Property("X0", get=lambda _: self.p0[0], set=lambda x, _: setattr(self, 'p0', np.array([x, self.p0[1], self.p0[2]])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Y0", get=lambda _: self.p0[1], set=lambda y, _: setattr(self, 'p0', np.array([self.p0[0], y, self.p0[2]])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Z0", get=lambda _: self.p0[2], set=lambda z, _: setattr(self, 'p0', np.array([self.p0[0], self.p0[1], z])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-
-                Property("X1", get=lambda _: self.p1[0], set=lambda x, _: setattr(self, 'p1', np.array([x, self.p1[1], self.p1[2]])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Y1", get=lambda _: self.p1[1], set=lambda y, _: setattr(self, 'p1', np.array([self.p1[0], y, self.p1[2]])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Z1", get=lambda _: self.p1[2], set=lambda z, _: setattr(self, 'p1', np.array([self.p1[0], self.p1[1], z])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-
-                Property("X2", get=lambda _: self.p2[0], set=lambda x, _: setattr(self, 'p2', np.array([x, self.p2[1], self.p2[2]])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Y2", get=lambda _: self.p2[1], set=lambda y, _: setattr(self, 'p2', np.array([self.p2[0], y, self.p2[2]])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Z2", get=lambda _: self.p2[2], set=lambda z, _: setattr(self, 'p2', np.array([self.p2[0], self.p2[1], z])), type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
+                Property("Point 0", get=lambda _: self.p0, set=lambda p, _: setattr(self, 'p0', p), type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p1 and node != self.p2})),
+                Property("Point 1", get=lambda _: self.p1, set=lambda p, _: setattr(self, 'p1', p), type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p0 and node != self.p2})),
+                Property("Point 2", get=lambda _: self.p2, set=lambda p, _: setattr(self, 'p2', p), type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p0 and node != self.p1})),
             ]
         }
     
     def __str__(self):
-        return f"ReferencePlane(name='{self._name}', mode={self._mode}, p0={self._p0.tolist()}, p1={self._p1.tolist()}, p2={self._p2.tolist()})"
+        return f"ReferencePlane(name='{self._name}', mode={self._mode}, p0={self._p0}, p1={self._p1}, p2={self._p2})"
     
     def __repr__(self):
-        return f"ReferencePlane(name='{self._name}', id={self.id}, mode={self._mode}, p0={self._p0.tolist()}, p1={self._p1.tolist()}, p2={self._p2.tolist()})"
+        return f"ReferencePlane(name='{self._name}', id={self.id}, mode={self._mode}, p0={self._p0}, p1={self._p1}, p2={self._p2})"
     
     def to_dict(self):
         return {
             'name': self.name,
             'id': str(self.id),
             'mode': self.mode,
-            'p0': self.p0.tolist(),
-            'p1': self.p1.tolist(),
-            'p2': self.p2.tolist(),
+            'p0_id': str(self.p0.id),
+            'p1_id': str(self.p1.id),
+            'p2_id': str(self.p2.id),
         }
     
     @staticmethod
@@ -364,14 +366,27 @@ class ReferencePlane(QObject):
         else:
             raise ValueError(f"Invalid mode: {mode_str}")
         
-        return ReferencePlane(
+        plane = ReferencePlane(
             name=data['name'],
             id=UUID(data['id']),
-            p0=np.array(data['p0'], dtype=float),
-            p1=np.array(data['p1'], dtype=float),
-            p2=np.array(data['p2'], dtype=float),
             mode=mode
         )
+
+        plane._p0_id = UUID(data['p0_id']) if data.get('p0_id') is not None else None
+        plane._p1_id = UUID(data['p1_id']) if data.get('p1_id') is not None else None
+        plane._p2_id = UUID(data['p2_id']) if data.get('p2_id') is not None else None
+
+        return plane
+
+
+    def fill_references(self, id_to_element: dict[UUID, EditorNode]):
+        if not hasattr(self, '_p0_id') or not hasattr(self, '_p1_id') or not hasattr(self, '_p2_id'):
+            print("Warning: ReferencePlane does not have '_p0_id', '_p1_id', or '_p2_id' attributes. Cannot fill references.")
+            return
+        
+        self.p0 = id_to_element.get(self._p0_id)
+        self.p1 = id_to_element.get(self._p1_id)
+        self.p2 = id_to_element.get(self._p2_id)
 
 class NodeGroup(QObject):
     did_change = Signal()

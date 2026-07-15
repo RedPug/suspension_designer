@@ -408,66 +408,6 @@ class Viewport3D(QOpenGLWidget):
 
         self.axes_gizmo.move(0, self.height() - self.axes_gizmo.height())
 
-    def cube_corners(self, center, size):
-        x, y, z = center
-        s = size / 2.0
-
-        return np.array([
-            [x - s, y - s, z - s],
-            [x + s, y - s, z - s],
-            [x + s, y + s, z - s],
-            [x - s, y + s, z - s],
-
-            [x - s, y - s, z + s],
-            [x + s, y - s, z + s],
-            [x + s, y + s, z + s],
-            [x - s, y + s, z + s],
-        ], dtype=np.float32)
-
-    def draw_cube(self, center, size):
-        world_pts = self.cube_corners(center, size)
-
-        cam_pts = self.camera.world_to_camera(world_pts)
-
-        edges = [
-            (0,1),(1,2),(2,3),(3,0),
-            (4,5),(5,6),(6,7),(7,4),
-            (0,4),(1,5),(2,6),(3,7)
-        ]
-
-        glColor3f(1, 1, 0)
-
-        glBegin(GL_LINES)
-
-        for a, b in edges:
-            glVertex3f(*cam_pts[a])
-            glVertex3f(*cam_pts[b])
-
-        glEnd()
-
-        faces = [
-            # face, normal
-            ((0,1,2,3), (0,0,-1)),  # back
-            ((4,5,6,7), (0,0,1)),   # front
-            ((0,1,5,4), (0,-1,0)),  # bottom
-            ((2,3,7,6), (0,1,0)),   # top
-            ((1,2,6,5), (1,0,0)),   # right
-            ((0,3,7,4), (-1,0,0)),  # left
-        ]
-
-        glColor3f(1, 0, 0)
-
-        glBegin(GL_QUADS)
-
-        for verts, normal in faces:
-            norm = self.camera.apply_rotation(np.array([normal]))[0]
-            glNormal3f(*norm)   # IMPORTANT
-
-            for idx in verts:
-                glVertex3f(*cam_pts[idx])
-
-        glEnd()
-
     def draw_cylinder(self, p1, p2, radius):
 
         p1 = np.asarray(p1, float)
@@ -542,7 +482,7 @@ class Viewport3D(QOpenGLWidget):
             if is_selected or is_group_selected:
                 glColor3f(0.0, 0.6, 1.0)  # Blue for selected nodes
             elif is_subselection:
-                glColor3f(1.0, 0.0, 0.0)  # Red for subselections
+                glColor3f(0.0, 0.8, 0.6)  # Cyan for subselections
             else:
                 glColor3f(1.0, 0.63, 0.0)  # Orange for unselected nodes
 
@@ -566,6 +506,8 @@ class Viewport3D(QOpenGLWidget):
         glDepthMask(GL_FALSE)
 
         for plane in self.scene_state.reference_planes:
+            if plane.point is None or plane.normal is None:
+                continue
             
             if plane.mode == ReferencePlane.Mode.PERPENDICULAR:
                 # ---- build basis in world space ----
@@ -593,9 +535,9 @@ class Viewport3D(QOpenGLWidget):
 
             elif plane.mode == ReferencePlane.Mode.CONTAINING:
                 corners = np.array([
-                    plane.p0,
-                    plane.p1,
-                    plane.p2
+                    plane.p0.world_position,
+                    plane.p1.world_position,
+                    plane.p2.world_position
                 ])
             else:
                 print("Unknown plane mode:", plane.mode)

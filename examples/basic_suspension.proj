@@ -1,7 +1,7 @@
 {
   "type": "editor",
   "name": "Basic Suspension",
-  "id": "94e6ac49-7349-407e-9521-d1964d737222",
+  "id": "7edc5385-d77e-45fc-8596-21a5e6e6f6ce",
   "nodes": [
     {
       "id": "4f71d11c-f44f-4934-b71d-e87fa81654c8",
@@ -80,6 +80,46 @@
         0.213,
         0.155,
         0.045
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "db947294-1159-469b-831a-d24bf2a1c8e1",
+      "name": "Rocker Outer",
+      "world_position": [
+        0.35000000000000003,
+        0.4,
+        0.0
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "6988eebb-0441-423c-ad66-eca869ee8ee8",
+      "name": "Rocker Pivot",
+      "world_position": [
+        0.25,
+        0.35000000000000003,
+        0.0
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
+      "name": "Coilover Mount",
+      "world_position": [
+        0.25,
+        0.55,
+        0.0
+      ],
+      "locked_plane_id": null
+    },
+    {
+      "id": "e075c5bd-7ebb-455e-b7f5-be1068c202cb",
+      "name": "Rocker Pivot Stabilizer",
+      "world_position": [
+        0.25,
+        0.35000000000000003,
+        0.1
       ],
       "locked_plane_id": null
     }
@@ -176,7 +216,10 @@
         "4f71d11c-f44f-4934-b71d-e87fa81654c8",
         "01221927-08e7-4282-a55e-91e223a86e92",
         "4602623a-09b7-4346-964c-0854ae56ab58",
-        "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c"
+        "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
+        "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
+        "6988eebb-0441-423c-ad66-eca869ee8ee8",
+        "e075c5bd-7ebb-455e-b7f5-be1068c202cb"
       ]
     },
     {
@@ -213,6 +256,23 @@
         "df522e2b-8839-428b-8e93-79e89fc16143",
         "e085b9df-7aa1-473c-8d86-621992f9c530"
       ]
+    },
+    {
+      "name": "Rocker",
+      "id": "b11e5a28-a16f-462b-a136-c8aab9e7e856",
+      "node_ids": [
+        "db947294-1159-469b-831a-d24bf2a1c8e1",
+        "6988eebb-0441-423c-ad66-eca869ee8ee8",
+        "e075c5bd-7ebb-455e-b7f5-be1068c202cb"
+      ]
+    },
+    {
+      "name": "Pushrod",
+      "id": "27e21975-a002-462f-9899-20ed77c55e55",
+      "node_ids": [
+        "db947294-1159-469b-831a-d24bf2a1c8e1",
+        "e7bfe798-d6fe-418e-b027-f265ff1a9f22"
+      ]
     }
   ],
   "model_variables": [
@@ -220,10 +280,17 @@
       "name": "Heave",
       "id": "e97a201c-8b3d-445a-87a6-a41b7e11ae06",
       "type": "displacement",
-      "axis_x": 0.01,
-      "axis_y": 0.0,
+      "axis_x": 0.0,
+      "axis_y": 0.001,
       "axis_z": 0.0,
-      "node_id": "6b271f4b-5a44-4ddb-b67d-93d409e83e58"
+      "node_id": "e7bfe798-d6fe-418e-b027-f265ff1a9f22"
+    },
+    {
+      "name": "Coilover Length",
+      "id": "1544ca11-37d7-4b2b-962c-a78fa49da958",
+      "type": "distance",
+      "node_a_id": "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
+      "node_b_id": "db947294-1159-469b-831a-d24bf2a1c8e1"
     }
   ]
 }

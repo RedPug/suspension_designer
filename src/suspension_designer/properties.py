@@ -140,10 +140,13 @@ class NumberPropertyType(PropertyType):
 
         editor.blockSignals(True)
 
-        if isinstance(editor, QSpinBox):
-            editor.setValue(int(value))
-        else:
-            editor.setValue(float(value) / self.multiplier)
+        try:
+            if isinstance(editor, QSpinBox):
+                editor.setValue(int(value))
+            else:
+                editor.setValue(float(value) / self.multiplier)
+        except:
+            editor.setValue(0)
 
         editor.blockSignals(False)
 

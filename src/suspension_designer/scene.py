@@ -180,6 +180,9 @@ class SceneState(QObject):
         for group in groups:
             group.fill_references(id_to_element)
 
+        for plane in planes:
+            plane.fill_references(id_to_element)
+
         for element in variables:
             element.fill_references(id_to_element)
 

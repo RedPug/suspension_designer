@@ -95,8 +95,15 @@ class Document:
 
         print(f"Saving document {self.name} to: {filepath}")
 
-        with open(filepath, "w") as f:
-            json.dump(data, f, indent=2)
+        try:
+            output_str = json.dumps(data, indent=2)
+
+            with open(filepath, "w") as f:
+                #only write to the file if there wasn't an error
+                f.write(output_str)
+        except:
+            print("Error occurred while serializing document data.")
+        
 
         self.has_changed = False
 
@@ -107,8 +114,12 @@ class Document:
     
     @staticmethod
     def load(filepath: str) -> 'Document':
-        with open(filepath, "r") as f:
-            data = json.load(f)
+        try:
+            with open(filepath, "r") as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"Error occurred while loading document from {filepath}: {e}")
+            return None
 
         type = data.get("type")
 
@@ -380,9 +391,12 @@ class DocumentManager(QObject):
         
         try:
             document = Document.load(filepath)
-            self.add_document(document)
-            self.select_document(document)
-            print(f"Loaded document {document.name} from {filepath}")
+            if document is not None:
+                self.add_document(document)
+                self.select_document(document)
+                print(f"Loaded document {document.name} from {filepath}")
+            else:
+                raise ValueError("Failed to load document. The file may be corrupted or of an unsupported type.")
         except Exception as e:
             print(f"Failed to load document: {e}")
 
