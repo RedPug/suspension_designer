@@ -20,8 +20,8 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtGui import QBrush, QColor
 
-from src.properties import GroupEditor, Property
-from src.document import (
+from suspension_designer.properties import GroupEditor, Property
+from suspension_designer.document import (
     DOCK_PROPERTIES,
     DOCK_TREE,
     Document,

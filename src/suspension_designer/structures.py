@@ -8,7 +8,7 @@ from PySide6.QtCore import (QObject, Signal)
 import numpy as np
 
 # from src.solver import SolverState, solve_system, SolverResult
-from src.properties import DropdownPropertyType, GroupPropertyType, NumberPropertyType, Property, StringPropertyType
+from suspension_designer.properties import DropdownPropertyType, GroupPropertyType, NumberPropertyType, Property, StringPropertyType
 # from src.scene import SceneState
 
 

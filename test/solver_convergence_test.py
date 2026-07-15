@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.document import Document
-from src.solver import solve
+from suspension_designer.document import Document
+from suspension_designer.solver import solve
 
 doc = Document.load("./my_motion.proj")
 

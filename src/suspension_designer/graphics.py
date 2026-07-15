@@ -19,11 +19,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtCore import QByteArray
 
-from src.structures import EditorNode, NodeGroup, ReferencePlane
-from src.model_variables import ModelVariableElement
-from src.document import Document, DocumentManager
-from src.rendering import Camera, Viewport3D
-from src.docks import PropertiesDock, TreeDock
+from suspension_designer.structures import EditorNode, NodeGroup, ReferencePlane
+from suspension_designer.model_variables import ModelVariableElement
+from suspension_designer.document import Document, DocumentManager
+from suspension_designer.rendering import Camera, Viewport3D
+from suspension_designer.docks import PropertiesDock, TreeDock
 
 # class FluidDragTabBar(QTabBar):
 #     tabSelectionFinalized = Signal(int)

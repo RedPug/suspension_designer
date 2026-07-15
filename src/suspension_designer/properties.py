@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 # Prevent circular imports during runtime type checking
 if TYPE_CHECKING:
-    from src.structures import SceneState, EditorNode
+    from suspension_designer.structures import SceneState, EditorNode
 
 
 class PropertyType(ABC):

@@ -19,8 +19,8 @@ from PySide6.QtWidgets import (
 	QWidget,
 )
 
-from src.model_variables import ModelVariableElement
-from src.scene import SceneState
+from suspension_designer.model_variables import ModelVariableElement
+from suspension_designer.scene import SceneState
 
 
 @dataclass

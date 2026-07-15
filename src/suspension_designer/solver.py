@@ -4,10 +4,10 @@ import numpy as np
 from dataclasses import dataclass
 import time
 
-from src.model_variables import DisplacementVariable, DistanceVariable
-from src.scene import SceneState
-from src.motion import MotionVariableData
-from src.math import get_rotation_matrix_from_quaternion, mult_quaternions
+from suspension_designer.model_variables import DisplacementVariable, DistanceVariable
+from suspension_designer.scene import SceneState
+from suspension_designer.motion import MotionVariableData
+from suspension_designer.math import get_rotation_matrix_from_quaternion, mult_quaternions
 
 
 @dataclass

@@ -23,9 +23,9 @@ QSurfaceFormat.setDefaultFormat(fmt)
 
 
 
-from src.math import get_rotation_matrix_from_quaternion, quaternion_from_direction, mult_quaternions
-from src.structures import NodeGroup, ReferencePlane, SelectionManager
-from src.scene import SceneState
+from suspension_designer.math import get_rotation_matrix_from_quaternion, quaternion_from_direction, mult_quaternions
+from suspension_designer.structures import NodeGroup, ReferencePlane, SelectionManager
+from suspension_designer.scene import SceneState
 
 class Camera:
     def __init__(self, viewport: QWidget, *,

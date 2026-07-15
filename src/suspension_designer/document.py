@@ -14,12 +14,12 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import QFileDialog
 
-from src.rendering import Viewport3D
-from src.motion import MotionData, MotionTableWidget
-from src.solver import SolverResult, solve
-from src.structures import SelectionManager
-from src.scene import SceneState
-from src.tree_model import SceneTreeModel
+from suspension_designer.rendering import Viewport3D
+from suspension_designer.motion import MotionData, MotionTableWidget
+from suspension_designer.solver import SolverResult, solve
+from suspension_designer.structures import SelectionManager
+from suspension_designer.scene import SceneState
+from suspension_designer.tree_model import SceneTreeModel
 
 
 DOCK_TREE = "tree"

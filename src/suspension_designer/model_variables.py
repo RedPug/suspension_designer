@@ -4,8 +4,8 @@ from uuid import UUID, uuid4
 from PySide6.QtCore import (QObject, Signal)
 import numpy as np
 
-from src.properties import DropdownPropertyType, NumberPropertyType, Property, StringPropertyType
-from src.structures import EditorNode
+from suspension_designer.properties import DropdownPropertyType, NumberPropertyType, Property, StringPropertyType
+from suspension_designer.structures import EditorNode
 
 class ModelVariableElement(QObject):
     did_change = Signal()
