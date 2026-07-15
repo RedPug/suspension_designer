@@ -170,8 +170,6 @@ class TreeDock(QDockWidget):
         return item.data
 
 
-
-
 class PropertiesDock(QDockWidget):
     dock_key = DOCK_PROPERTIES
 

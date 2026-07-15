@@ -121,7 +121,7 @@ class Document:
             solver_result = SolverResult.from_dict(data)
             document = ResultsDocument(name=name, filepath=filepath, solver_result=solver_result)
         elif type == "motion":
-            motion_data = data.get("motion_data")
+            motion_data = data.get("motion_data", data if "variables" in data else {})
             document = MotionDocument(
                 name=name,
                 filepath=filepath,
@@ -186,8 +186,20 @@ class MotionDocument(Document):
         if self.scene_state is not None and not self.motion_data.variables:
             self.motion_data = MotionData.from_scene_state(self.scene_state)
 
-        if self.scene_state is None and self.editor_filepath:
-            self.resolve_source_scene_state()
+    def _build_solved_scene_state(self, result: SolverResult) -> SceneState:
+        solved_scene = SceneState.from_dict(self.scene_state.to_dict())
+        solved_scene.is_editable = False
+
+        positions_by_index: dict[int, list[np.ndarray]] = {}
+        for group in result.system_state.groups:
+            for node in group.nodes:
+                positions_by_index.setdefault(node.index, []).append(np.array(node.get_world_position(), dtype=float))
+
+        for node_index, positions in positions_by_index.items():
+            if 0 <= node_index < len(solved_scene.nodes):
+                solved_scene.nodes[node_index].world_position = np.mean(positions, axis=0)
+
+        return solved_scene
 
     def resolve_source_scene_state(self):
         if self.document_manager is not None and self.editor_filepath:
@@ -207,21 +219,6 @@ class MotionDocument(Document):
                 self.scene_state = source_document.scene_state
 
         return self.scene_state
-
-    def _build_solved_scene_state(self, result: SolverResult) -> SceneState:
-        solved_scene = SceneState.from_dict(self.scene_state.to_dict())
-        solved_scene.is_editable = False
-
-        positions_by_index: dict[int, list[np.ndarray]] = {}
-        for group in result.system_state.groups:
-            for node in group.nodes:
-                positions_by_index.setdefault(node.index, []).append(np.array(node.get_world_position(), dtype=float))
-
-        for node_index, positions in positions_by_index.items():
-            if 0 <= node_index < len(solved_scene.nodes):
-                solved_scene.nodes[node_index].world_position = np.mean(positions, axis=0)
-
-        return solved_scene
 
     def solve_into_editor_document(self):
         self.resolve_source_scene_state()
@@ -335,9 +332,9 @@ class DocumentManager(QObject):
             self.selected_doc_index = self._documents.index(doc)
 
             if isinstance(doc, MotionDocument):
-                source_document = self.get_document_by_filepath(doc.editor_filepath)
-                if isinstance(source_document, EditorDocument):
-                    doc.sync_from_editor_document(source_document)
+                doc.resolve_source_scene_state()
+                if doc.scene_state is not None:
+                    doc.motion_data.sync_from_scene_state(doc.scene_state)
 
             self.selection_changed.emit(doc)
         else:
