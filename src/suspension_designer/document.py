@@ -159,7 +159,7 @@ class Document(Selectable):
                 name=name,
                 filepath=filepath,
                 motion_data=motion_data,
-                editor_filepath=data.get("editor_filepath"),
+                editor_filepath=doc_data.get("editor_filepath"),
             )
         else:
             raise ValueError(f"Unknown document type: {type}")
