@@ -14,37 +14,37 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import QFileDialog
 
+from suspension_designer.properties import Property, StringPropertyType
 from suspension_designer.rendering import Viewport3D
 from suspension_designer.motion import MotionData, MotionTableWidget
 from suspension_designer.solver import SolverResult, solve
-from suspension_designer.structures import SelectionManager
+from suspension_designer.selection import SelectionManager, Selectable
 from suspension_designer.scene import SceneState
 from suspension_designer.tree_model import SceneTreeModel
+from suspension_designer.results import build_solved_scene_state
 
 
 DOCK_TREE = "tree"
 DOCK_PROPERTIES = "properties"
 
 
-class Document:
+class Document(Selectable):
     def __init__(self, name: str, filepath: str = None):
-        self.name = name
+        super().__init__(name)
+
         self.has_changed = False
+        self.did_change.connect(lambda: setattr(self, "has_changed", True))
+
         self.filepath = filepath
+
         self.widget = None
         self.document_manager = None
-        self.id = uuid4()
+
         self.selection_manager = SelectionManager()
         self.dock_layout_state: str | None = None
 
     def create_tree_model(self) -> QAbstractItemModel:
         return None
-
-    def get_properties(self):
-        pass
-
-    def get_menus(self):
-        pass
 
     def required_docks(self) -> tuple[str, ...]:
         return tuple()
@@ -69,12 +69,31 @@ class Document:
     def create_widget(self):
         raise NotImplementedError("Subclasses must implement the create_widget method.")
     
+    def get_property_list(self):
+        return {
+            "Info":[
+                Property("ID",
+                    get=lambda _: self.id,
+                    type=StringPropertyType()
+                ),
+                Property("Name",
+                    get=lambda _: self.name,
+                    set=lambda name, _: setattr(self, 'name', name),
+                    type=StringPropertyType()
+                ),
+                Property("Filepath",
+                    get=lambda _: self.filepath,
+                    type=StringPropertyType()
+                ),
+            ]
+        }
+    
     def _save(self, filepath: str, data: dict, type: str) -> bool:
         data = {
             "type": type,
             "name": self.name,
             "id": str(self.id),
-            **data,
+            "document_data": data,
         }
 
         if filepath is None:
@@ -103,6 +122,7 @@ class Document:
                 f.write(output_str)
         except:
             print("Error occurred while serializing document data.")
+            return False
         
 
         self.has_changed = False
@@ -125,14 +145,16 @@ class Document:
 
         name = data.get("name", "Untitled")
 
+        doc_data = data.get("document_data", data)
+
         if type == "editor":
-            scene_state = SceneState.from_dict(data)
+            scene_state = SceneState.from_dict(doc_data)
             document = EditorDocument(name=name, filepath=filepath, scene=scene_state)
         elif type == "results":
-            solver_result = SolverResult.from_dict(data)
+            solver_result = SolverResult.from_dict(doc_data)
             document = ResultsDocument(name=name, filepath=filepath, solver_result=solver_result)
         elif type == "motion":
-            motion_data = data.get("motion_data")
+            motion_data = doc_data.get("motion_data")
             document = MotionDocument(
                 name=name,
                 filepath=filepath,
@@ -219,21 +241,6 @@ class MotionDocument(Document):
 
         return self.scene_state
 
-    def _build_solved_scene_state(self, result: SolverResult) -> SceneState:
-        solved_scene = SceneState.from_dict(self.scene_state.to_dict())
-        solved_scene.is_editable = False
-
-        positions_by_index: dict[int, list[np.ndarray]] = {}
-        for group in result.system_state.groups:
-            for node in group.nodes:
-                positions_by_index.setdefault(node.index, []).append(np.array(node.get_world_position(), dtype=float))
-
-        for node_index, positions in positions_by_index.items():
-            if 0 <= node_index < len(solved_scene.nodes):
-                solved_scene.nodes[node_index].world_position = np.mean(positions, axis=0)
-
-        return solved_scene
-
     def solve_into_editor_document(self):
         self.resolve_source_scene_state()
 
@@ -253,7 +260,7 @@ class MotionDocument(Document):
         #     print(f"Failed to solve motion document: {error}")
         #     return None
 
-        solved_scene = self._build_solved_scene_state(result)
+        solved_scene = build_solved_scene_state(self.scene_state, result)
         solved_document = EditorDocument(
             name=f"{self.name} Solved",
             scene=solved_scene,
@@ -306,6 +313,8 @@ class MotionDocument(Document):
 class DocumentManager(QObject):
     document_added = Signal(Document)
     document_removed = Signal(Document)
+
+    document_changed = Signal(Document)
 
     selection_changed = Signal(Document)
 
@@ -406,15 +415,21 @@ class DocumentManager(QObject):
         raise IndexError("Document index out of range.")
 
     def add_document(self, document: Document, select=False):
+        document.did_change.connect(lambda: self.document_changed.emit(document))
+
         document.document_manager = self
         self._documents.append(document)
         self.document_added.emit(document)
         if select:
             self.select_document(document)
+        
+        
 
     def remove_document(self, document: Document):
         if document not in self._documents:
             raise ValueError("Document not found in the manager.")
+        
+        document.did_change.disconnect(lambda: self.document_changed.emit(document))
         
         self._documents.remove(document)
         self.document_removed.emit(document)

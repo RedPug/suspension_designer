@@ -10,17 +10,14 @@ import numpy as np
 # from src.solver import SolverState, solve_system, SolverResult
 from suspension_designer.properties import DropdownPropertyType, GroupPropertyType, NumberPropertyType, Property, StringPropertyType
 # from src.scene import SceneState
+from suspension_designer.selection import Selectable
 
 
+class EditorNode(Selectable):
 
-class EditorNode(QObject):
-    did_change = Signal()  # Signal to emit when the node's properties change
+    def __init__(self, name: str, *, world_position: np.ndarray, id: UUID = None):
+        super().__init__(name, id=id)
 
-    def __init__(self, name: str, world_position: np.ndarray, id: UUID = None):
-        super().__init__()
-        
-        self._id = uuid4() if id is None else id
-        self._name = name
         self._world_position = world_position
         self._locked_plane: Optional[ReferencePlane] = None  # The plane to which this node is locked, if any
 
@@ -61,19 +58,6 @@ class EditorNode(QObject):
         if self._locked_plane is not None:
             self._locked_plane.did_change.connect(self._on_locked_plane_changed)
         self.world_position = self.world_position  # Re-apply the constraint to ensure the position is valid
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        self._name = value
-        self.did_change.emit()
-
-    @property
-    def id(self):
-        return self._id
     
     def fill_references(self, id_to_element: dict[UUID, Any]):
         if not hasattr(self, '_locked_plane_id'):
@@ -162,18 +146,13 @@ class EditorNode(QObject):
         node._locked_plane_id = UUID(data['locked_plane_id']) if data['locked_plane_id'] is not None else None
         return node
 
-class ReferencePlane(QObject):
-    did_change = Signal()  # Signal to emit when the plane's properties change
-
+class ReferencePlane(Selectable):
     class Mode(StrEnum):
         CONTAINING = auto()
         PERPENDICULAR = auto()
 
     def __init__(self, name: str = "Unnamed", *, id: UUID = None, mode: 'ReferencePlane.Mode', p0: EditorNode = None, p1: EditorNode = None, p2: EditorNode = None):
-        super().__init__()
-        
-        self._name = name
-        self.id = id if id is not None else uuid4()
+        super().__init__(name, id=id)
 
         self._mode = mode
         self._p0 = p0
@@ -243,15 +222,6 @@ class ReferencePlane(QObject):
     def p2(self, value):
         self._p2 = value
         self._rebuild()
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        self._name = value
-        self.did_change.emit()
 
     @property
     def mode(self):
@@ -388,23 +358,11 @@ class ReferencePlane(QObject):
         self.p1 = id_to_element.get(self._p1_id)
         self.p2 = id_to_element.get(self._p2_id)
 
-class NodeGroup(QObject):
-    did_change = Signal()
+class NodeGroup(Selectable):
 
     def __init__(self, name: str, *, id:UUID = None, nodes: list[EditorNode]):
-        super().__init__()
-        self._name = name
-        self.id = id if id is not None else uuid4()
+        super().__init__(name, id=id)
         self._nodes = nodes
-
-    @property
-    def name(self):
-        return self._name
-    
-    @name.setter
-    def name(self, value):
-        self._name = value
-        self.did_change.emit()
 
     @property
     def nodes(self):
@@ -468,52 +426,3 @@ class NodeGroup(QObject):
         group = NodeGroup(name=data['name'], id=UUID(data['id']), nodes=[])
         group.node_ids = node_ids  # Store the IDs temporarily
         return group
-
-Selectable = Union[EditorNode, ReferencePlane]
-
-class SelectionManager(QObject):
-    selection_changed = Signal()  # Signal to emit when selection changes
-
-    def __init__(self):
-        super().__init__()
-
-        self._selected_object: Selectable = None
-        self._subselections: list[Selectable] = []
-
-        self.selection_changed.connect(lambda: print(f"Selection changed to: {self._selected_object}"))
-
-    def on_selection_modified(self):
-        self._update_subselections()
-        self.selection_changed.emit()
-
-    def _update_subselections(self):
-        if self._selected_object is None:
-            self._subselections = []
-        else:
-            if hasattr(self._selected_object, 'get_subselections'):
-                self._subselections = self._selected_object.get_subselections()
-            else:
-                self._subselections = []
-
-    def set_selected(self, item: Selectable):
-        if self._selected_object == item:
-            return  # No change in selection
-        
-        if self._selected_object is not None:
-            self._selected_object.did_change.disconnect(self.on_selection_modified)
-
-        self._selected_object = item
-
-        if self._selected_object is not None:
-            self._selected_object.did_change.connect(self.on_selection_modified)
-
-        # self._update_subselections()
-
-        self.on_selection_modified()
-
-    def get_selected(self) -> Selectable:
-        return self._selected_object
-
-    @property
-    def subselections(self) -> list[Selectable]:
-        return self._subselections

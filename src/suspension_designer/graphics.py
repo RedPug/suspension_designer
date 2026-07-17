@@ -105,6 +105,7 @@ class TabBar(QTabBar):
 
         self.document_manager.document_added.connect(self.on_doc_added)
         self.document_manager.document_removed.connect(self.on_doc_removed)
+        self.document_manager.document_changed.connect(self.on_doc_changed)
 
     def on_doc_added(self, document: Document):
         index = self.addTab(document.name)
@@ -123,6 +124,15 @@ class TabBar(QTabBar):
                 self.main_window.stack.removeWidget(document.widget)
                 break
         
+    def on_doc_changed(self, document: Document):
+        index = 0
+        while index < self.count():
+            if self.tabData(index) == document:
+                break
+            index = index + 1
+
+        self.setTabText(index, document.name)
+
     def on_tab_changed(self, index):
         # print(f"Tab changed to index: {index}")
         doc = self.tabData(index)

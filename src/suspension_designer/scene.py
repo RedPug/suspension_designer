@@ -12,13 +12,14 @@ from suspension_designer.structures import EditorNode, NodeGroup, ReferencePlane
 
 
 class SceneState(QObject):
-    scene_changed = Signal()  # Signal to emit when the scene state changes
+    did_change = Signal()  # Signal to emit when the scene state changes
 
     def __init__(self, *, nodes: list[EditorNode] = [], edges: np.ndarray = np.array([]), groups: list[NodeGroup] = [], planes: list[ReferencePlane] = [], model_variables: list[ModelVariableElement] = [], is_editable: bool = True, name: str = "Unnamed Scene"):
         super().__init__()
+        
         self._nodes = nodes
         for node in self._nodes:
-            node.did_change.connect(self.scene_changed.emit)
+            node.did_change.connect(self.did_change.emit)
 
         self.element_lookup = {}
     
@@ -30,16 +31,16 @@ class SceneState(QObject):
             self.reference_planes = planes
 
         for plane in self.reference_planes:
-            plane.did_change.connect(self.scene_changed.emit)
+            plane.did_change.connect(self.did_change.emit)
 
 
         self._groups = groups
         for group in self._groups:
-            group.did_change.connect(self.scene_changed.emit)
+            group.did_change.connect(self.did_change.emit)
 
         self._model_variables: list[ModelVariableElement] = model_variables
         for variable in self._model_variables:
-            variable.did_change.connect(self.scene_changed.emit)
+            variable.did_change.connect(self.did_change.emit)
 
         self.name = name
 
@@ -48,27 +49,27 @@ class SceneState(QObject):
 
     def add_node(self, node: EditorNode):
         self._nodes.append(node)
-        node.did_change.connect(self.scene_changed.emit)
+        node.did_change.connect(self.did_change.emit)
         self.element_lookup |= {node.id: node}
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_reference_plane(self, plane: ReferencePlane):
         self.reference_planes.append(plane)
-        plane.did_change.connect(self.scene_changed.emit)
+        plane.did_change.connect(self.did_change.emit)
         self.element_lookup |= {plane.id: plane}
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_group(self, group: NodeGroup):
         self._groups.append(group)
-        group.did_change.connect(self.scene_changed.emit)
+        group.did_change.connect(self.did_change.emit)
         self.element_lookup |= {group.id: group}
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_model_variable(self, variable: ModelVariableElement):
         self._model_variables.append(variable)
-        variable.did_change.connect(self.scene_changed.emit)
+        variable.did_change.connect(self.did_change.emit)
         self.element_lookup |= {variable.id: variable}
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     @property
     def nodes(self) -> list[EditorNode]:
@@ -79,14 +80,14 @@ class SceneState(QObject):
         assert isinstance(value, list) and all(isinstance(node, EditorNode) for node in value), "Nodes must be a list of EditorNodes"
         
         for node in self._nodes:
-            node.did_change.disconnect(self.scene_changed.emit)
+            node.did_change.disconnect(self.did_change.emit)
 
         self._nodes = value
         self.element_lookup = {}
         for node in self._nodes:
-            node.did_change.connect(self.scene_changed.emit)
+            node.did_change.connect(self.did_change.emit)
 
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     @property
     def edges(self) -> np.ndarray:
@@ -97,7 +98,7 @@ class SceneState(QObject):
         assert type(value) == np.ndarray and value.ndim == 2 and value.shape[1] == 2, "Edges must be a 2D numpy array with shape (N, 2)"
         
         self._edges = value
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     @property
     def groups(self) -> list[NodeGroup]:
@@ -108,14 +109,14 @@ class SceneState(QObject):
         assert isinstance(value, list) and all(isinstance(group, NodeGroup) for group in value), "Groups must be a list of NodeGroups"
         
         for group in self._groups:
-            group.did_change.disconnect(self.scene_changed.emit)
+            group.did_change.disconnect(self.did_change.emit)
 
         self._groups = value
         self.element_lookup = {}
         for group in self._groups:
-            group.did_change.connect(self.scene_changed.emit)
+            group.did_change.connect(self.did_change.emit)
 
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     @property
     def model_variables(self) -> list[ModelVariableElement]:
@@ -124,20 +125,20 @@ class SceneState(QObject):
     def delete_element(self, element):
         if type(element) == EditorNode:
             self.nodes.remove(element)
-            element.did_change.disconnect(self.scene_changed.emit)
+            element.did_change.disconnect(self.did_change.emit)
         elif type(element) == ReferencePlane:
             self.reference_planes.remove(element)
-            element.did_change.disconnect(self.scene_changed.emit)
+            element.did_change.disconnect(self.did_change.emit)
         elif type(element) == NodeGroup:
             self.groups.remove(element)
-            element.did_change.disconnect(self.scene_changed.emit)
+            element.did_change.disconnect(self.did_change.emit)
         elif isinstance(element, ModelVariableElement):
             self._model_variables.remove(element)
-            element.did_change.disconnect(self.scene_changed.emit)
+            element.did_change.disconnect(self.did_change.emit)
         else:
             raise ValueError("Element must be an EditorNode, ReferencePlane, or NodeGroup")
         
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def get_element_by_id(self, id: UUID, force_refresh: bool = False):
         if self.element_lookup is None or force_refresh:
@@ -204,7 +205,7 @@ class SceneState(QObject):
         self.model_variables = other.model_variables
         self.is_editable = other.is_editable
 
-        self.scene_changed.emit()  # Emit signal to notify that the scene has changed
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def copy(self) -> 'SceneState':
         return SceneState.from_dict(self.to_dict())

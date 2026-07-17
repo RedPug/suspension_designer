@@ -24,7 +24,8 @@ QSurfaceFormat.setDefaultFormat(fmt)
 
 
 from suspension_designer.math import get_rotation_matrix_from_quaternion, quaternion_from_direction, mult_quaternions
-from suspension_designer.structures import NodeGroup, ReferencePlane, SelectionManager
+from suspension_designer.structures import NodeGroup, ReferencePlane
+from suspension_designer.selection import SelectionManager
 from suspension_designer.scene import SceneState
 
 class Camera:
@@ -281,7 +282,7 @@ class Viewport3D(QOpenGLWidget):
         self.setMouseTracking(True)
 
         self.selection_manager.selection_changed.connect(lambda: self.update())
-        self.scene_state.scene_changed.connect(lambda: self.update())
+        self.scene_state.did_change.connect(lambda: self.update())
 
 
     # ============================
@@ -298,7 +299,6 @@ class Viewport3D(QOpenGLWidget):
     # ============================
 
     def initializeGL(self):
-        print("initializing")
 
         glClearColor(0.8, 0.8, 0.8, 1.0)
 

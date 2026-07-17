@@ -1,47 +1,13 @@
-import json
+print("Starting...")
+
 import os
-# os.environ["QT_QUICK_BACKEND"] = "software" # or force a different backend
-# os.environ["QT_OPENGL"] = "software" # or force a different OpenGL implementation
 
-import numpy as np
-
-# from src.scene import Scene
-from suspension_designer.document import Document, EditorDocument
-# from src.structures import DisplacementVariable, SceneState, solve
+from suspension_designer.document import Document
 from suspension_designer.graphics import MainWindow
 from PySide6.QtWidgets import QApplication
-import matplotlib.pyplot as plt
-# from src.math import mult_quaternions, get_rotation_matrix_from_quaternion
-from suspension_designer.document import MotionDocument
 from suspension_designer.settings import SettingsManager
 
 SettingsManager.read()
-
-# system_state = SolverState(groups=[chassis_group, upright_group, upper_group, lower_group], linkages=linkages1)
-nodes = np.array([
-    [0.267,0.260,-0.165], # 0
-    [0.236,0.110,-0.153], # 1
-    [0.240,0.096,0.217], # 2
-    [0.245, 0.278, 0.233], # 3
-    [0.565, 0.109, -0.005], # 4
-    [0.539,0.295,-0.021], # 5
-    [0.570, 0.170, 0.075], # 6
-    [0.213, 0.155, 0.045], # 7
-], dtype=float)
-
-node_groups = [
-    [0,1,2,3],  # chassis
-    [4,5,6],        # upright
-    [0,3,5],          # upper control arm
-    [1,2,4],          # lower control arm
-    [6,7], # toe rod
-]
-
-edges = []
-for group in node_groups:
-    for i in range(len(group)):
-        j = (i + 1) % len(group)
-        edges.append((group[i], group[j]))
 
 app = QApplication([])
 window = MainWindow()
@@ -59,7 +25,6 @@ if files:
         print(f"Loading last opened file: {file}")
         doc = Document.load(file)
         window.document_manager.add_document(doc, select=True)
-
 
 # open_motion_document_from_default_editor(window)
 

@@ -4,7 +4,7 @@ from suspension_designer.scene import SceneState
 
 
 class TreeItem:
-    def __init__(self, name: str, data=None, parent=None, *, can_rename: bool = ..., can_select: bool = True):
+    def __init__(self, name: str, *, data=None, parent=None, can_rename: bool = ..., can_select: bool = True):
         self.name = name
         self.data = data
         self.parent = parent
@@ -32,15 +32,15 @@ class SceneTreeModel(QAbstractItemModel):
         super().__init__(parent)
 
         self.document = document
-        
-        # self.document.selection_manager.selection_changed.connect(self._build_tree)
 
         self._build_tree()
 
     def _build_tree(self):
-        self.root = TreeItem("Scene")
+        self.root = TreeItem("Root!", can_select=False)
 
         scene: SceneState = self.document.scene_state
+
+        self.root.add_child(TreeItem("Scene", data=self.document))
 
         nodes = TreeItem("Nodes", can_select=False)
         groups = TreeItem("Groups", can_select=False)
@@ -53,16 +53,16 @@ class SceneTreeModel(QAbstractItemModel):
         self.root.add_child(model_variables)
 
         for node in scene.nodes:
-            nodes.add_child(TreeItem(node.name, node))
+            nodes.add_child(TreeItem(node.name, data=node))
 
         for group in scene.groups:
-            groups.add_child(TreeItem(group.name, group))
+            groups.add_child(TreeItem(group.name, data=group))
 
         for plane in scene.reference_planes:
-            planes.add_child(TreeItem(plane.name, plane))
+            planes.add_child(TreeItem(plane.name, data=plane))
 
         for element in scene.model_variables:
-            model_variables.add_child(TreeItem(element.name, element))
+            model_variables.add_child(TreeItem(element.name, data=element))
 
     # ---------- Required Qt methods ----------
 
