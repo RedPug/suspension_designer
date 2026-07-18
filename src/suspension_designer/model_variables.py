@@ -111,7 +111,7 @@ class ModelVariable(QObject):
         self._name = value
         self.did_change.emit()
     
-    def evaluate(self) -> float:
+    def evaluate(self, position_id_map: dict[UUID, np.ndarray]) -> float:
         raise NotImplementedError("Subclasses should implement this method.")
 
     def prescribe(self, value: float):
@@ -188,10 +188,13 @@ class DisplacementVariable(ModelVariable):
         self.did_change.emit()
 
     def get_displacement(self, mag: float) -> np.ndarray:
-        return mag * np.array([self.axis_x, self.axis_y, self.axis_z])
+        axis = np.array([self.axis_x, self.axis_y, self.axis_z])
+        axis /= np.linalg.norm(axis) if np.linalg.norm(axis) != 0 else 1
+        return mag * axis
     
-    def evaluate(self) -> float:
-        return 0.0
+    def evaluate(self, position_id_map: dict[UUID, np.ndarray]) -> float:
+        delta = position_id_map.get(self.node.id) - self.node.world_position
+        return np.dot(delta, self.get_displacement(1.0))
 
     def get_property_list(self) -> dict[str, list[Property]]:
         return super().get_property_list() | {
@@ -285,8 +288,12 @@ class DistanceVariable(ModelVariable):
         self._node_b = value
         self.did_change.emit()
 
-    def evaluate(self) -> float:
-        return np.linalg.norm(self.node_a.world_position - self.node_b.world_position)
+    def evaluate(self, position_id_map: dict[UUID, np.ndarray]) -> float:
+        pos_a = position_id_map.get(self.node_a.id)
+        pos_b = position_id_map.get(self.node_b.id)
+        if pos_a is None or pos_b is None:
+            return 0.0
+        return np.linalg.norm(pos_a - pos_b)
 
 
     def get_property_list(self) -> dict[str, list[Property]]:

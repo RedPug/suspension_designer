@@ -12,16 +12,30 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QFileDialog,
+    QHeaderView,
+    QLabel,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from PySide6.QtGui import QClipboard, QKeySequence
+
 
 from suspension_designer.properties import Property, StringPropertyType
 from suspension_designer.rendering import Viewport3D
 from suspension_designer.motion import MotionData, MotionTableWidget
-from suspension_designer.solver import SolverResult, solve
+from suspension_designer.solver import SolverResult
 from suspension_designer.selection import SelectionManager, Selectable
 from suspension_designer.scene import SceneState
 from suspension_designer.tree_model import SceneTreeModel
-from suspension_designer.results import build_solved_scene_state
+from suspension_designer.results_compiler import ResultsCompilation, ResultsCompiler
+
 
 
 DOCK_TREE = "tree"
@@ -148,11 +162,22 @@ class Document(Selectable):
         doc_data = data.get("document_data", data)
 
         if type == "editor":
+
             scene_state = SceneState.from_dict(doc_data)
             document = EditorDocument(name=name, filepath=filepath, scene=scene_state)
+
         elif type == "results":
-            solver_result = SolverResult.from_dict(doc_data)
-            document = ResultsDocument(name=name, filepath=filepath, solver_result=solver_result)
+            if "times" in doc_data and "rows" in doc_data:
+                compilation = ResultsCompilation(
+                    times=doc_data.get("times", []),
+                    variable_columns=doc_data.get("variable_columns", []),
+                    rows=doc_data.get("rows", []),
+                    steps=[],
+                )
+                document = ResultDocument(name=name, filepath=filepath, compilation=compilation)
+            else:
+                solver_result = SolverResult.from_dict(doc_data)
+                document = ResultDocument(name=name, filepath=filepath, solver_result=solver_result)
         elif type == "motion":
             motion_data = doc_data.get("motion_data")
             document = MotionDocument(
@@ -165,6 +190,7 @@ class Document(Selectable):
             raise ValueError(f"Unknown document type: {type}")
 
         return document
+    
     
 
 class EditorDocument(Document):
@@ -194,23 +220,122 @@ class EditorDocument(Document):
         self._save(filepath, data, type="editor")
 
 
-class ResultsDocument(Document):
-    def __init__(self, name: str, filepath: str = None, solver_result: SolverResult = None):
+class CopyableTableWidget(QTableWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+
+    def keyPressEvent(self, event):
+        # Override Ctrl+C for copying table values to clipboard
+        if event.matches(QKeySequence.StandardKey.Copy):
+            self.copy_selection_to_clipboard()
+        else:
+            super().keyPressEvent(event)
+
+    def copy_selection_to_clipboard(self):
+        selection = self.selectedRanges()
+        if not selection:
+            return
+
+        text_parts = []
+        
+        for range_obj in selection:
+            # 1. Extract and append headers for the selected columns
+            header_values = []
+            for c in range(range_obj.leftColumn(), range_obj.rightColumn() + 1):
+                header_item = self.horizontalHeaderItem(c)
+                # Fallback to column index number if no explicit header text is set
+                header_text = header_item.text() if header_item else f"Column {c+1}"
+                header_values.append(header_text)
+            
+            text_parts.append("\t".join(header_values))
+
+            # 2. Extract and append the corresponding row data
+            for r in range(range_obj.topRow(), range_obj.bottomRow() + 1):
+                row_values = []
+                for c in range(range_obj.leftColumn(), range_obj.rightColumn() + 1):
+                    item = self.item(r, c)
+                    row_values.append(item.text() if (item and item.text()) else "")
+                
+                text_parts.append("\t".join(row_values))
+
+        # Join everything with newlines and send to system clipboard
+        text_data = "\n".join(text_parts) + "\n"
+        QApplication.clipboard().setText(text_data)
+
+class ResultDocument(Document):
+    def __init__(self, name: str, filepath: str = None, solver_result: SolverResult = None, compilation: ResultsCompilation = None):
         super().__init__(name, filepath)
         self.solver_result = solver_result
+        self.compilation = compilation
+        self.table_widget = None
 
     def create_widget(self):
-        pass
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        if self.compilation is None and self.solver_result is None:
+            layout.addWidget(QLabel("No results available."))
+            self.widget = widget
+            return self.widget
+
+        if self.compilation is not None:
+            layout.addWidget(QLabel("Compilation Results"))
+            headers, table_rows = self.compilation.to_table()
+
+            table = CopyableTableWidget(widget)
+            table.setColumnCount(len(headers))
+            table.setRowCount(len(table_rows))
+            table.setHorizontalHeaderLabels(headers)
+            table.verticalHeader().setVisible(False)
+            # table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            # table.setSelectionMode(QAbstractItemView.SingleSelection)
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+            table.horizontalHeader().setStretchLastSection(True)
+
+            for row_index, row in enumerate(table_rows):
+                for column_index, value in enumerate(row):
+                    table.setItem(row_index, column_index, QTableWidgetItem("" if value is None else str(value)))
+
+            self.table_widget = table
+            layout.addWidget(table)
+        else:
+            layout.addWidget(QLabel(str(self.solver_result)))
+
+        self.widget = widget
+        return self.widget
 
     def save(self, filepath: str = None):
         # Implement saving logic for the results document
-        self._save(filepath, self.solver_result.to_dict(), type="results")
+        if self.compilation is not None:
+            data = {
+                "times": self.compilation.times,
+                "variable_columns": self.compilation.variable_columns,
+                "rows": self.compilation.rows,
+            }
+        elif self.solver_result is not None:
+            data = {
+                "solver_result": str(self.solver_result),
+            }
+        else:
+            data = {}
+
+        self._save(filepath, data, type="results")
+
+
+# Backwards-compatible alias for existing imports.
+ResultsDocument = ResultDocument
+
+
 
 class MotionDocument(Document):
     def __init__(self, name: str, filepath: str = None, scene_state: SceneState = None, motion_data: MotionData | dict | None = None, editor_filepath: str | None = None):
         super().__init__(name, filepath)
         self.scene_state = scene_state
         self.editor_filepath = editor_filepath
+
         if isinstance(motion_data, MotionData):
             self.motion_data = motion_data
         else:
@@ -241,7 +366,7 @@ class MotionDocument(Document):
 
         return self.scene_state
 
-    def solve_into_editor_document(self):
+    def solve_into_result_document(self):
         self.resolve_source_scene_state()
 
         if self.scene_state is None:
@@ -254,21 +379,25 @@ class MotionDocument(Document):
 
         self.motion_data.sync_from_scene_state(self.scene_state)
 
-        # try:
-        result = solve(self.scene_state, self.motion_data.variables, t=0.0)
-        # except Exception as error:
-        #     print(f"Failed to solve motion document: {error}")
-        #     return None
-
-        solved_scene = build_solved_scene_state(self.scene_state, result)
-        solved_document = EditorDocument(
-            name=f"{self.name} Solved",
-            scene=solved_scene,
+        compiler = ResultsCompiler(
+            self.scene_state,
+            self.motion_data,
+            start_time=0.0,
+            end_time=1.0,
+            step=0.01,
         )
-        solved_document.scene_state.is_editable = False
+        compilation = compiler.compile()
 
-        self.document_manager.add_document(solved_document, select=True)
-        return solved_document
+        result_document = ResultDocument(
+            name=f"{self.name} Results",
+            compilation=compilation,
+        )
+
+        self.document_manager.add_document(result_document, select=True)
+        return result_document
+
+    def solve_into_editor_document(self):
+        return self.solve_into_result_document()
 
     def sync_from_editor_document(self, editor_document: EditorDocument | None):
         if editor_document is None:
@@ -290,7 +419,7 @@ class MotionDocument(Document):
             self.motion_data,
             scene_state=self.scene_state,
             selection_manager=self.selection_manager,
-            solve_callback=self.solve_into_editor_document,
+            solve_callback=self.solve_into_result_document,
         )
         return self.widget
 
@@ -309,6 +438,7 @@ class MotionDocument(Document):
             },
             type="motion",
         )
+
 
 class DocumentManager(QObject):
     document_added = Signal(Document)

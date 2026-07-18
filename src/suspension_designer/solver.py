@@ -16,11 +16,33 @@ class SolverResult:
     error: float
     errors: np.ndarray
     iterations: int
+    epsilon: float
     did_converge: bool
     time: float
 
+    @property
+    def precision_digits(self):
+        return int(np.floor(-np.log10(self.epsilon)))
+
     def __str__(self):
         return f"SolverResult(error={self.error:.6f}, iterations={self.iterations}, did_converge={self.did_converge}, time={self.time:.4f}s)"
+
+    @staticmethod
+    def from_dict(data: dict) -> 'SolverResult':
+        system_state_data = data.get("system_state")
+        system_state = SolverState.from_dict(system_state_data) if isinstance(system_state_data, dict) else system_state_data
+
+        errors = np.array(data.get("errors", []), dtype=float)
+
+        return SolverResult(
+            system_state=system_state,
+            error=float(data.get("error", 0.0)),
+            errors=errors,
+            iterations=int(data.get("iterations", 0)),
+            did_converge=bool(data.get("did_converge", False)),
+            time=float(data.get("time", 0.0)),
+        )
+
 
 class Node:
 
@@ -143,11 +165,6 @@ class RigidGroup:
             color=self.color
         )
         return new_group
-
-class CorrectionProvider:
-    def solve_for_correction(self) -> np.ndarray:
-        """Returns a 3D vector representing the correction to apply to a node to satisfy a constraint."""
-        raise NotImplementedError("Subclasses should implement this method.")
 
 class Linkage:
     def __init__(self, name: str, node1: Node, node2: Node, target_distance: Optional[float] = None):
@@ -369,7 +386,6 @@ class SolverState:
 
 def _apply_linkages(system_state: SolverState, easing_factor, max_iterations, epsilon, rotation_strength):
     """Recompute the positions of all linkages based on their connected nodes."""
-    print("applying linkages with displacements:", system_state.displacements)
     did_converge = False
     errors = []
 
@@ -422,7 +438,7 @@ def _apply_linkages(system_state: SolverState, easing_factor, max_iterations, ep
     # print(f"Reached max iterations with error: {error:.6f}")
     return np.array(errors), iterations, did_converge
 
-def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=1000, epsilon=(1e-5)/2, rotation_strength=0.5)-> SolverResult:
+def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=1000, epsilon=(1e-9)/2, rotation_strength=0.5)-> SolverResult:
     """Iteratively solve for the positions of all groups based on the linkage constraints.
 
     Args:
@@ -441,7 +457,14 @@ def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=10
 
     # print(f"Solved system in {t1-t0:.4f} seconds")
 
-    return SolverResult(system_state=system_copy, error=errors[-1], errors=errors, iterations=iterations, time=t1-t0, did_converge=did_converge)
+    return SolverResult(
+        system_state=system_copy,
+        error=errors[-1],
+        errors=errors,
+        iterations=iterations,
+        epsilon=epsilon,
+        time=t1-t0,
+        did_converge=did_converge)
 
 
 def solve(scene_state: SceneState, motion_variables: list[MotionVariableData], t: float = 0.0, **kwargs) -> SolverResult:
@@ -454,7 +477,7 @@ def solve(scene_state: SceneState, motion_variables: list[MotionVariableData], t
     displacements: list[tuple[int, np.ndarray]] = []
     motion_variables_by_id = {variable.id: variable for variable in motion_variables}
 
-    print("model_variables:", current_state.model_variables)
+    # print("model_variables:", current_state.model_variables)
 
     for element in current_state.model_variables:
         variable = element.variable
@@ -472,7 +495,6 @@ def solve(scene_state: SceneState, motion_variables: list[MotionVariableData], t
             node = variable.node
             if node is not None:
                 displacements.append((current_state.nodes.index(node), variable.get_displacement(sampled_value)))
-            
             else:
                 print(f"Skipping variable {variable.name} at time {t} because its node is None.")
     
@@ -493,7 +515,6 @@ def solve(scene_state: SceneState, motion_variables: list[MotionVariableData], t
             if node1 is not None and node2 is not None:
                 links.append((node1, node2, sampled_value))
 
-    print("about to run solver with displacements:", displacements)
     solver_state = SolverState.from_connections(
         nodes=nodes,
         node_groups=groups,
@@ -506,3 +527,10 @@ def solve(scene_state: SceneState, motion_variables: list[MotionVariableData], t
     print(result)
 
     return result
+
+def solve_multiple(scene_state: SceneState, motion_variables: list[MotionVariableData], times: np.ndarray, **kwargs):
+    results = []
+    for t in times:
+        result = solve(scene_state, motion_variables, t, **kwargs)
+        results.append(result)
+    return results

@@ -37,7 +37,7 @@ class SelectionManager(QObject):
         self._selected_object: Selectable = None
         self._subselections: list[Selectable] = []
 
-        self.selection_changed.connect(lambda: print(f"Selection changed to: {self._selected_object}"))
+        # self.selection_changed.connect(lambda: print(f"Selection changed to: {self._selected_object}"))
 
     def on_selection_modified(self):
         self._update_subselections()
