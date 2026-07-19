@@ -38,6 +38,8 @@ class TreeDock(QDockWidget):
 
         self.document_manager = document_manager
 
+        self.current_doc = None
+
         self.document_manager.selection_changed.connect(self.setDocument)
 
         self.tree = QTreeView(self)
@@ -65,17 +67,31 @@ class TreeDock(QDockWidget):
 
     def setDocument(self, document: Document):
         """Switch to displaying a different document."""
+        if document == self.current_doc:
+            return
 
-        try:
-            self.document_manager.current_document.did_change.disconnect(self.refreshTree)
-        except Exception:
-            pass
+        if self.current_doc:
+            self.current_doc.did_change.disconnect(self.refreshTree)
+            self.current_doc.selection_manager.selection_changed.disconnect(self.restoreSelection)
+
+        self.current_doc = document
 
         if document is None:
             self.tree.setModel(None)
             return
+        
+        document.selection_manager.selection_changed.connect(
+            self.restoreSelection
+        )
+
+        document.did_change.connect(self.refreshTree)
+
+
 
         self.tree.setModel(document.create_tree_model())
+
+        # Optional
+        self.tree.expandToDepth(1)
 
         if self.tree.model() is None:
             return
@@ -83,16 +99,6 @@ class TreeDock(QDockWidget):
         self.tree.selectionModel().selectionChanged.connect(
             self._onSelectionChanged
         )
-
-        # Optional
-        self.tree.expandToDepth(1)
-
-        document.selection_manager.selection_changed.connect(
-            self.restoreSelection
-        )
-
-        document.did_change.connect(self.refreshTree)
-
         self.restoreSelection()
 
     def refreshTree(self):

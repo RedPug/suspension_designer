@@ -108,13 +108,21 @@ class TabBar(QTabBar):
         self.document_manager.document_changed.connect(self.on_doc_changed)
 
     def on_doc_added(self, document: Document):
+        # supress changes to prevent tab being selected before it has data.
+        self.blockSignals(True)
         index = self.addTab(document.name)
-
         self.setTabData(index, document)
+        self.blockSignals(False)
+
+        # this is the first tab to be added, select it.
+        if index == 0 and self.count() == 1:
+            self.setCurrentIndex(0)
+        
 
         self.main_window.stack.addWidget(document.create_widget())
 
         self.setCurrentIndex(index)
+        
         
 
     def on_doc_removed(self, document: Document):
@@ -137,7 +145,11 @@ class TabBar(QTabBar):
         # print(f"Tab changed to index: {index}")
         doc = self.tabData(index)
         if doc is None:
-            print("Error: document does not exist for the selected tab.")
+            if index >= 0:
+                print("Error: document does not exist for the selected tab {}.".format(index))
+                print("tabs count: {}, tabs:".format(self.count()))
+                for i in range(self.count()):
+                    print(f"  {i}: {self.tabText(i)}")
             return
         
         self.document_manager.select_document(doc)
