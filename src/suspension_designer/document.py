@@ -1,6 +1,7 @@
 from uuid import uuid4
 import json
 import os
+import csv
 
 import numpy as np
 
@@ -35,6 +36,7 @@ from suspension_designer.selection import SelectionManager, Selectable
 from suspension_designer.scene import SceneState
 from suspension_designer.tree_model import SceneTreeModel
 from suspension_designer.results_compiler import ResultsCompilation, ResultsCompiler
+from suspension_designer.data_manager import save_csv, save_json, get_filepath
 
 
 
@@ -102,7 +104,7 @@ class Document(Selectable):
             ]
         }
     
-    def _save(self, filepath: str, data: dict, type: str) -> bool:
+    def _save_proj(self, filepath: str, data: dict, type: str) -> tuple[bool, str | None]:
         data = {
             "type": type,
             "name": self.name,
@@ -110,42 +112,16 @@ class Document(Selectable):
             "document_data": data,
         }
 
-        if filepath is None:
-            if self.filepath is None:
-                filepath, _ = QFileDialog.getSaveFileName(
-                    None,
-                    "Save Project",
-                    "",
-                    "Project Files (*.proj)"
-                )
-                if not filepath:
-                    print("Save operation cancelled.")
-                    return False
-            else:
-                filepath = self.filepath
+        if filepath is not None:
+            self.filepath = filepath
+            if save_json(filepath, data):
+                return True, filepath
+            
+        return False, None
 
-        self.filepath = filepath
-
-        print(f"Saving document {self.name} to: {filepath}")
-
-        try:
-            output_str = json.dumps(data, indent=2)
-
-            with open(filepath, "w") as f:
-                #only write to the file if there wasn't an error
-                f.write(output_str)
-        except:
-            print("Error occurred while serializing document data.")
-            return False
-        
-
-        self.has_changed = False
-
-        return True
-    
-    def save(self, filepath: str = None):
+    def save(self, prompt_user: bool = False) -> tuple[bool, str | None]:
         raise NotImplementedError("Subclasses must implement the save method.")
-    
+
     @staticmethod
     def load(filepath: str) -> 'Document':
         try:
@@ -161,6 +137,8 @@ class Document(Selectable):
 
         doc_data = data.get("document_data", data)
 
+        document = None
+
         if type == "editor":
 
             scene_state = SceneState.from_dict(doc_data)
@@ -175,9 +153,6 @@ class Document(Selectable):
                     steps=[],
                 )
                 document = ResultDocument(name=name, filepath=filepath, compilation=compilation)
-            else:
-                solver_result = SolverResult.from_dict(doc_data)
-                document = ResultDocument(name=name, filepath=filepath, solver_result=solver_result)
         elif type == "motion":
             motion_data = doc_data.get("motion_data")
             document = MotionDocument(
@@ -188,8 +163,11 @@ class Document(Selectable):
             )
         else:
             raise ValueError(f"Unknown document type: {type}")
-
-        return document
+        
+        if document is not None:
+            return document
+        else:
+            raise ValueError(f"Failed to create document from filepath: {filepath}")
     
     
 
@@ -213,11 +191,18 @@ class EditorDocument(Document):
         self.widget = self.viewport
         return self.widget
     
-    def save(self, filepath: str = None):
+    def save(self, prompt_user: bool = False) -> tuple[bool, str | None]:
         # Implement saving logic for the scene document
         data = self.scene_state.to_dict()
 
-        self._save(filepath, data, type="editor")
+        filepath = get_filepath(default_path=self.filepath if not prompt_user else None, prompt="Save Editor Document", filter=["proj"])
+
+        if not filepath:
+            return False, None
+        
+        if self._save_proj(filepath, data, type="editor"):
+            return True, filepath
+        return False, None
 
 
 class CopyableTableWidget(QTableWidget):
@@ -264,9 +249,8 @@ class CopyableTableWidget(QTableWidget):
         QApplication.clipboard().setText(text_data)
 
 class ResultDocument(Document):
-    def __init__(self, name: str, filepath: str = None, solver_result: SolverResult = None, compilation: ResultsCompilation = None):
+    def __init__(self, name: str, filepath: str = None, compilation: ResultsCompilation = None):
         super().__init__(name, filepath)
-        self.solver_result = solver_result
         self.compilation = compilation
         self.table_widget = None
 
@@ -276,7 +260,7 @@ class ResultDocument(Document):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        if self.compilation is None and self.solver_result is None:
+        if self.compilation is None:
             layout.addWidget(QLabel("No results available."))
             self.widget = widget
             return self.widget
@@ -307,26 +291,30 @@ class ResultDocument(Document):
         self.widget = widget
         return self.widget
 
-    def save(self, filepath: str = None):
+    def save(self, prompt_user: bool = False) -> bool:
         # Implement saving logic for the results document
-        if self.compilation is not None:
-            data = {
-                "times": self.compilation.times,
-                "variable_columns": self.compilation.variable_columns,
-                "rows": self.compilation.rows,
-            }
-        elif self.solver_result is not None:
-            data = {
-                "solver_result": str(self.solver_result),
-            }
+        filepath = get_filepath(default_path=self.filepath if not prompt_user else None, prompt="Save Results", filter=["proj","csv"])
+        if not filepath:
+            return False, None
+        
+        ext = os.path.splitext(filepath)[1]
+        if ext == ".csv":
+            if save_csv(filepath, header=["time"] + self.compilation.variable_columns, rows=self.compilation.rows):
+                return True, filepath
+        elif ext == ".proj":
+            if self.compilation is not None:
+                data = {
+                    "times": self.compilation.times,
+                    "variable_columns": self.compilation.variable_columns,
+                    "rows": self.compilation.rows,
+                }
+            else:
+                data = {}
+            if self._save_proj(filepath, data, type="results"):
+                return True, filepath
         else:
-            data = {}
-
-        self._save(filepath, data, type="results")
-
-
-# Backwards-compatible alias for existing imports.
-ResultsDocument = ResultDocument
+            print(f"Unsupported file format: {ext}")
+        return False, None
 
 
 
@@ -426,18 +414,25 @@ class MotionDocument(Document):
     def required_docks(self) -> tuple[str, ...]:
         return (DOCK_TREE, DOCK_PROPERTIES)
 
-    def save(self, filepath: str = None):
+    def save(self, prompt_user: bool = False) -> tuple[bool, str | None]:
+        filepath = get_filepath(default_path=self.filepath if not prompt_user else None, prompt="Save Motion Document", filter=["proj"])
+
+        if not filepath:
+            return False, None
+
         if self.scene_state is not None:
             self.motion_data.sync_from_scene_state(self.scene_state)
 
-        self._save(
+        if self._save_proj(
             filepath,
             {
                 "motion_data": self.motion_data.to_dict(),
                 "editor_filepath": self.editor_filepath,
             },
             type="motion",
-        )
+        ):
+            return True, filepath
+        return False, None
 
 
 class DocumentManager(QObject):
@@ -495,27 +490,26 @@ class DocumentManager(QObject):
 
     def save_all(self):
         for doc in self._documents:
-            doc.save()
-            print(f"Saved {doc.name} to {doc.filepath}")
+            _, path = doc.save()
+            print(f"Saved {doc.name} to {path}")
 
     def save_current(self):
         if self.selected_doc_index is None:
             print("No document is currently selected.")
             return
         
-        current_doc = self._documents[self.selected_doc_index]  # Assuming the first document is the current one
-        current_doc.save()
-        print(f"Saved {current_doc.name} to {current_doc.filepath}")
+        current_doc = self._documents[self.selected_doc_index]
+        _, path = current_doc.save()
+        print(f"Saved {current_doc.name} to {path}")
 
     def save_current_as(self):
         if self.selected_doc_index is None:
             print("No document is currently selected.")
             return
         
-        current_doc = self._documents[self.selected_doc_index]  # Assuming the first document is the current one
-        current_doc.filepath = None
-        current_doc.save()
-        print(f"Saved {current_doc.name} to {current_doc.filepath}")
+        current_doc = self._documents[self.selected_doc_index]
+        _, path = current_doc.save(prompt_user=True)
+        print(f"Saved {current_doc.name} to {path}")
 
     def load(self):
         filepath, _ = QFileDialog.getOpenFileName(

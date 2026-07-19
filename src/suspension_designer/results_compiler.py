@@ -104,7 +104,12 @@ class ResultsCompiler:
         rows: list[dict[str, Any]] = []
         steps: list[ResultsCompilationStep] = []
 
+        total_steps = len(times)
+        current_step = 0
+
         for time_value in times:
+            current_step += 1
+
             solver_result = self._solve_at_time(motion_profile.variables, float(time_value))
             solved_scene_state = build_solved_scene_state(self.scene_state, solver_result)
             variable_values = self._evaluate_model_variables(solver_result)
@@ -125,6 +130,10 @@ class ResultsCompiler:
                     variable_values=variable_values,
                 )
             )
+
+            print(f"Completed {current_step}/{total_steps}")
+
+
 
         return ResultsCompilation(
             times=[float(t) for t in times],
