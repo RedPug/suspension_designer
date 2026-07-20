@@ -68,8 +68,8 @@ def save_json(filepath: str, data: dict) -> bool:
         with open(filepath, "w") as f:
             #only write to the file if there wasn't an error
             f.write(output_str)
-    except:
-        print("Error occurred while serializing document data.")
+    except Exception as e:
+        print(f"Error occurred while serializing document data: {e}")
         return False
 
     return True

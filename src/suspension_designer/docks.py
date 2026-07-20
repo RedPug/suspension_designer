@@ -328,8 +328,11 @@ class PropertiesDock(QDockWidget):
 
     # ---------------------------------------------------------
 
-    def on_property_changed(self, prop):
-        prop.commit(self.document_manager.current_document.scene_state)
+    def on_property_changed(self, prop: Property):
+        if hasattr(self.document_manager.current_document, 'scene_state'):
+            prop.commit(self.document_manager.current_document.scene_state)
+        else:
+            prop.commit(None)
 
     # ---------------------------------------------------------
 

@@ -145,6 +145,18 @@ class SceneState(QObject):
             self.element_lookup = {node.id: node for node in self.nodes} | {plane.id: plane for plane in self.reference_planes} | {group.id: group for group in self.groups} | {variable.id: variable for variable in self._model_variables}
 
         return self.element_lookup.get(id, None)
+    
+    def update_node_positions(self, node_positions: np.ndarray):
+        for i, node in enumerate(self.nodes):
+            if 0 <= i < len(node_positions):
+                node.world_position = node_positions[i]
+        print("Updated node positions")
+
+    def strip_reference(self) -> 'SceneState':
+        # Create a new instance without any reference geometry
+        scene = SceneState.from_dict(self.to_dict())
+        scene.reference_planes = []
+        return scene
 
     def to_dict(self):
         table = {

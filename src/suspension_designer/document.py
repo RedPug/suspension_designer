@@ -31,6 +31,7 @@ from PySide6.QtGui import QClipboard, QKeySequence
 from suspension_designer.properties import Property, StringPropertyType
 from suspension_designer.rendering import Viewport3D
 from suspension_designer.motion import MotionData, MotionTableWidget
+from suspension_designer.result_viewer import ResultViewer
 from suspension_designer.solver import SolverResult
 from suspension_designer.selection import SelectionManager, Selectable
 from suspension_designer.scene import SceneState
@@ -145,14 +146,9 @@ class Document(Selectable):
             document = EditorDocument(name=name, filepath=filepath, scene=scene_state)
 
         elif type == "results":
-            if "times" in doc_data and "rows" in doc_data:
-                compilation = ResultsCompilation(
-                    times=doc_data.get("times", []),
-                    variable_columns=doc_data.get("variable_columns", []),
-                    rows=doc_data.get("rows", []),
-                    steps=[],
-                )
-                document = ResultDocument(name=name, filepath=filepath, compilation=compilation)
+            compilation = ResultsCompilation.from_dict(doc_data)
+            document = ResultDocument(name=name, filepath=filepath, compilation=compilation)
+
         elif type == "motion":
             motion_data = doc_data.get("motion_data")
             document = MotionDocument(
@@ -205,93 +201,23 @@ class EditorDocument(Document):
         return False, None
 
 
-class CopyableTableWidget(QTableWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
-
-    def keyPressEvent(self, event):
-        # Override Ctrl+C for copying table values to clipboard
-        if event.matches(QKeySequence.StandardKey.Copy):
-            self.copy_selection_to_clipboard()
-        else:
-            super().keyPressEvent(event)
-
-    def copy_selection_to_clipboard(self):
-        selection = self.selectedRanges()
-        if not selection:
-            return
-
-        text_parts = []
-        
-        for range_obj in selection:
-            # 1. Extract and append headers for the selected columns
-            header_values = []
-            for c in range(range_obj.leftColumn(), range_obj.rightColumn() + 1):
-                header_item = self.horizontalHeaderItem(c)
-                # Fallback to column index number if no explicit header text is set
-                header_text = header_item.text() if header_item else f"Column {c+1}"
-                header_values.append(header_text)
-            
-            text_parts.append("\t".join(header_values))
-
-            # 2. Extract and append the corresponding row data
-            for r in range(range_obj.topRow(), range_obj.bottomRow() + 1):
-                row_values = []
-                for c in range(range_obj.leftColumn(), range_obj.rightColumn() + 1):
-                    item = self.item(r, c)
-                    row_values.append(item.text() if (item and item.text()) else "")
-                
-                text_parts.append("\t".join(row_values))
-
-        # Join everything with newlines and send to system clipboard
-        text_data = "\n".join(text_parts) + "\n"
-        QApplication.clipboard().setText(text_data)
-
 class ResultDocument(Document):
     def __init__(self, name: str, filepath: str = None, compilation: ResultsCompilation = None):
         super().__init__(name, filepath)
         self.compilation = compilation
+        self.result_viewer = ResultViewer(self.compilation, self.selection_manager)
+        self.scene_state = self.result_viewer.scene_state
         self.table_widget = None
+        self.widget = None
+    
+    def required_docks(self) -> tuple[str, ...]:
+        return (DOCK_PROPERTIES,)
 
     def create_widget(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
-
-        if self.compilation is None:
-            layout.addWidget(QLabel("No results available."))
-            self.widget = widget
-            return self.widget
-
-        if self.compilation is not None:
-            layout.addWidget(QLabel("Compilation Results"))
-            headers, table_rows = self.compilation.to_table()
-
-            table = CopyableTableWidget(widget)
-            table.setColumnCount(len(headers))
-            table.setRowCount(len(table_rows))
-            table.setHorizontalHeaderLabels(headers)
-            table.verticalHeader().setVisible(False)
-            # table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            # table.setSelectionMode(QAbstractItemView.SingleSelection)
-            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-            table.horizontalHeader().setStretchLastSection(True)
-
-            for row_index, row in enumerate(table_rows):
-                for column_index, value in enumerate(row):
-                    table.setItem(row_index, column_index, QTableWidgetItem("" if value is None else str(value)))
-
-            self.table_widget = table
-            layout.addWidget(table)
-        else:
-            layout.addWidget(QLabel(str(self.solver_result)))
-
-        self.widget = widget
+        self.widget = self.result_viewer.get_widget()
         return self.widget
 
-    def save(self, prompt_user: bool = False) -> bool:
+    def save(self, prompt_user: bool = False) -> tuple[bool, str | None]:
         # Implement saving logic for the results document
         filepath = get_filepath(default_path=self.filepath if not prompt_user else None, prompt="Save Results", filter=["proj","csv"])
         if not filepath:
@@ -299,15 +225,12 @@ class ResultDocument(Document):
         
         ext = os.path.splitext(filepath)[1]
         if ext == ".csv":
-            if save_csv(filepath, header=["time"] + self.compilation.variable_columns, rows=self.compilation.rows):
+            header, rows = self.compilation.to_table()
+            if save_csv(filepath, header, rows=rows):
                 return True, filepath
         elif ext == ".proj":
             if self.compilation is not None:
-                data = {
-                    "times": self.compilation.times,
-                    "variable_columns": self.compilation.variable_columns,
-                    "rows": self.compilation.rows,
-                }
+                data = self.compilation.to_dict()
             else:
                 data = {}
             if self._save_proj(filepath, data, type="results"):
@@ -374,18 +297,16 @@ class MotionDocument(Document):
             end_time=1.0,
             step=0.01,
         )
-        compilation = compiler.compile()
+        
+        def on_compilation_complete(compilation: ResultsCompilation):
+            result_document = ResultDocument(
+                name=f"{self.name} Results",
+                compilation=compilation,
+            )
+            self.document_manager.add_document(result_document, select=True)
+            self._active_thread
 
-        result_document = ResultDocument(
-            name=f"{self.name} Results",
-            compilation=compilation,
-        )
-
-        self.document_manager.add_document(result_document, select=True)
-        return result_document
-
-    def solve_into_editor_document(self):
-        return self.solve_into_result_document()
+        self._active_thread = compiler.compile(completed=on_compilation_complete)
 
     def sync_from_editor_document(self, editor_document: EditorDocument | None):
         if editor_document is None:

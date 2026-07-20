@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from concurrent.futures import thread
 from dataclasses import dataclass, field
 from math import floor
-from typing import Any, Sequence
+import pickle
+import threading
+import threading
+from time import perf_counter, time, sleep
+from typing import Any, Callable, Sequence
 from uuid import UUID
 
 import numpy as np
+
+from PySide6.QtCore import QObject, QTimer, Signal, Signal
 
 from suspension_designer.model_variables import DisplacementVariable, DistanceVariable
 from suspension_designer.motion import MotionData, MotionVariableData
@@ -18,50 +25,86 @@ class ResultsCompilationStep:
     """One simulated step of a compiled motion profile."""
 
     time: float
-    solver_result: SolverResult
-    solved_scene_state: SceneState
-    variable_values: dict[str, Any] = field(default_factory=dict)
+    error: float
+    iterations: int
+    epsilon: float
+    did_converge: bool
+    node_positions: list[tuple[float, float, float]]
+    variable_values: list
 
 
 @dataclass
 class ResultsCompilation:
     """Tabular output for a compiled motion profile."""
-
-    times: list[float]
-    variable_columns: list[str]
-    rows: list[dict[str, Any]]
+    base_scene: SceneState
+    steps: list[ResultsCompilationStep]
+    variable_names: list[str]
     precision_digits: int
-    steps: list[ResultsCompilationStep] = field(default_factory=list)
     
 
     def to_dict(self) -> dict:
         return {
-            "times": self.times,
-            "variable_columns": self.variable_columns,
-            "rows": self.rows,
+            "precision_digits": self.precision_digits,
+            "variable_names": self.variable_names,
+            "base_scene": self.base_scene.to_dict(),
             "steps": [
                 {
                     "time": step.time,
-                    "solver_result": step.solver_result.to_dict(),
+                    "error": step.error,
+                    "iterations": step.iterations,
+                    "epsilon": step.epsilon,
+                    "did_converge": step.did_converge,
+                    "node_positions": step.node_positions,
                     "variable_values": step.variable_values,
                 }
                 for step in self.steps
             ],
         }
+    
+    @staticmethod
+    def from_dict(data: dict) -> ResultsCompilation:
+        return ResultsCompilation(
+            precision_digits=data.get("precision_digits"),
+            base_scene=SceneState.from_dict(data["base_scene"]),
+            variable_names=data.get("variable_names"),
+            steps=[
+                ResultsCompilationStep(
+                    time=step["time"],
+                    error=step["error"],
+                    iterations=step["iterations"],
+                    epsilon=step["epsilon"],
+                    did_converge=step["did_converge"],
+                    node_positions=step["node_positions"],
+                    variable_values=step["variable_values"],
+                )
+                for step in data["steps"]
+            ],
+        )
+
 
     def to_table(self) -> tuple[list[str], list[list[str]]]:
         base_header = ["time", "solver_error", "iterations", "did_converge"]
-        headers = base_header + self.variable_columns
+        headers = base_header + self.variable_names
 
         table_rows = []
-        for row in self.rows:
-            values = [str(row.get(header)) for header in headers[:len(base_header)]]
-            values.extend([f'{row.get(header):.{self.precision_digits}f}' for header in headers[len(base_header):]])
+        for step in self.steps:
+            values = [
+                step.time,
+                step.error,
+                step.iterations,
+                step.did_converge,
+            ]
+            values.extend([f'{step.variable_values[i]:.{self.precision_digits}f}' for i in range(len(self.variable_names))])
 
             table_rows.append(values)
 
         return headers, table_rows
 
+
+# 1. Create a lightweight signal bridge
+class ThreadBridge(QObject):
+    # This signal carries the final object back to the main thread
+    compilation_ready = Signal(ResultsCompilation)
 
 class ResultsCompiler:
     """Simulates a motion profile and compiles model-variable values into a table."""
@@ -92,7 +135,7 @@ class ResultsCompiler:
 
         return np.round(np.arange(self.start_time, self.end_time + self.step * 0.5, self.step), 10)
 
-    def compile(self) -> ResultsCompilation:
+    def _compile(self) -> ResultsCompilation:
         """Run the solver at each time step and collect values for all model variables."""
 
         motion_profile = MotionData.from_dict(self.motion_profile.to_dict())
@@ -101,47 +144,75 @@ class ResultsCompiler:
         times = self.get_times()
         variable_columns = self._build_variable_columns()
 
-        rows: list[dict[str, Any]] = []
         steps: list[ResultsCompilationStep] = []
 
         total_steps = len(times)
         current_step = 0
 
+        precision_digits = 16
+
+        progress_index = 0
+        PROGRESS_TEXT = "1....2....3....4....5....6....7....8....9....!"
+
+        print("Solving: ", end="", flush=True)
+
+        solving_time_sum = 0.0
+
+        t0 = perf_counter()
         for time_value in times:
             current_step += 1
 
             solver_result = self._solve_at_time(motion_profile.variables, float(time_value))
-            solved_scene_state = build_solved_scene_state(self.scene_state, solver_result)
-            variable_values = self._evaluate_model_variables(solver_result)
+            node_positions = get_solved_node_positions(solver_result).tolist()
+            variable_value_dict = self._evaluate_model_variables(solver_result)
+            variable_values = [variable_value_dict[col] for col in variable_columns]
 
-            rows.append({
-                "time": float(time_value),
-                "solver_error": float(solver_result.error),
-                "iterations": int(solver_result.iterations),
-                "did_converge": bool(solver_result.did_converge),
-                **variable_values,
-            })
+            solving_time_sum += solver_result.time
 
             steps.append(
                 ResultsCompilationStep(
-                    time=float(time_value),
-                    solver_result=solver_result,
-                    solved_scene_state=solved_scene_state,
+                    time=time_value,
+                    error=solver_result.error,
+                    iterations=solver_result.iterations,
+                    epsilon=solver_result.epsilon,
+                    did_converge=solver_result.did_converge,
+                    node_positions=node_positions,
                     variable_values=variable_values,
                 )
             )
 
-            print(f"Completed {current_step}/{total_steps}")
+            precision_digits = min(precision_digits, solver_result.precision_digits)
 
+            # print(f"Completed {current_step}/{total_steps}")
+            while progress_index <= (len(PROGRESS_TEXT)-1)*current_step/total_steps:
+                print(PROGRESS_TEXT[progress_index], end="", flush=True)
+                progress_index += 1
 
+        t1 = perf_counter()
+        print("\nDone compiling results in {:.3f} seconds ({:.3f} solving)".format(t1 - t0, solving_time_sum))
 
         return ResultsCompilation(
-            times=[float(t) for t in times],
-            variable_columns=variable_columns,
-            rows=rows,
+            base_scene=self.scene_state,
+            variable_names=variable_columns,
             steps=steps,
-            precision_digits=solver_result.precision_digits
+            precision_digits=precision_digits
         )
+    
+    def compile(self, completed: Callable[[ResultsCompilation], None]):
+        bridge = ThreadBridge()
+        bridge.compilation_ready.connect(completed)
+
+        def func():
+            result = self._compile()
+            bridge.compilation_ready.emit(result)
+
+        thread = threading.Thread(target=func)
+
+        #store bridge so it isn't garbage collected
+        thread.bridge = bridge
+
+        thread.start()
+        return thread
 
     def _build_variable_columns(self) -> list[str]:
         columns: list[str] = []
@@ -239,20 +310,3 @@ def get_position_id_map(result: SolverResult, scene_state: SceneState) -> dict[U
         position_id_map[scene_state.nodes[i].id] = positions[i]
 
     return position_id_map
-
-def build_solved_scene_state(scene_state: SceneState, result: SolverResult) -> SceneState:
-    """Generates a new SceneState with solved node positions applied."""
-
-    solved_scene = SceneState.from_dict(scene_state.to_dict())
-    solved_scene.is_editable = False
-
-    for node in solved_scene.nodes:
-        node.locked_plane = None
-
-    positions = get_solved_node_positions(result)
-
-    for i, position in enumerate(positions):
-        if 0 <= i < len(solved_scene.nodes):
-            solved_scene.nodes[i].world_position = position
-
-    return solved_scene

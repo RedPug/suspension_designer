@@ -25,70 +25,6 @@ from suspension_designer.document import Document, DocumentManager
 from suspension_designer.rendering import Camera, Viewport3D
 from suspension_designer.docks import PropertiesDock, TreeDock
 
-# class FluidDragTabBar(QTabBar):
-#     tabSelectionFinalized = Signal(int)
-
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.setMovable(True)
-#         self.setChangeCurrentOnDrag(False)
-        
-#         self._drag_start_pos = QPoint()
-#         self._initial_tab_index = -1
-#         self._has_moved = False
-        
-#         self.tabMoved.connect(self._on_tab_moved)
-
-#     def _on_tab_moved(self, from_idx, to_idx):
-#         self._has_moved = True
-#         if self._initial_tab_index == from_idx:
-#             self._initial_tab_index = to_idx
-
-#     def mousePressEvent(self, event: QMouseEvent):
-#         if event.button() == Qt.MouseButton.LeftButton:
-#             self._drag_start_pos = event.position().toPoint()
-#             self._initial_tab_index = self.tabAt(self._drag_start_pos)
-#             self._has_moved = False
-#         super().mousePressEvent(event)
-
-#     def mouseReleaseEvent(self, event: QMouseEvent):
-#         if event.button() == Qt.MouseButton.LeftButton:
-#             clicked_index = self.tabAt(event.position().toPoint())
-            
-#             # Temporarily block signals during the release to ensure 
-#             # external listeners don't form an infinite loop.
-#             self.blockSignals(True)
-#             super().mouseReleaseEvent(event) 
-            
-#             if self._has_moved:
-#                 # Tab moved: force index back to the starting tab's new home
-#                 self.setCurrentIndex(self._initial_tab_index)
-#             else:
-#                 # Pure click: select clicked index
-#                 if clicked_index != -1:
-#                     self.setCurrentIndex(clicked_index)
-            
-#             self.blockSignals(False)
-
-#             # SAFE FIX: Unpolish and repolish the style engine.
-#             # This cleanly resets the CSS :selected pseudo-states 
-#             # without accessing invalid C++ memory pointers.
-#             self.style().unpolish(self)
-#             self.style().polish(self)
-#             self.update()
-            
-#             # Manually emit selection change only if it was a final click
-#             if not self._has_moved and clicked_index != -1:
-#                 self.tabSelectionFinalized.emit(clicked_index)
-
-#             # Reset trackers
-#             self._initial_tab_index = -1
-#             self._has_moved = False
-#             return
-            
-#         super().mouseReleaseEvent(event)
-
-
 class TabBar(QTabBar):
     def __init__(self, main_window: 'MainWindow', document_manager: DocumentManager):
         super().__init__(main_window)
@@ -276,7 +212,14 @@ class MenuBar(QMenuBar):
         self._save_active_dock_state()
         self._active_document = document
 
-        required_docks = set(document.required_docks()) if document is not None else set()
+        if document is None:
+            required_docks = set()
+        else:
+            required = document.required_docks()
+            if isinstance(required, str):
+                required_docks = {required}
+            else:
+                required_docks = set(required)
 
         self._restoring_docks = True
 
