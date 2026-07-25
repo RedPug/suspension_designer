@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from concurrent.futures import thread
+from concurrent.futures import ProcessPoolExecutor, wait
+import multiprocessing
 from dataclasses import dataclass, field
-from math import floor
+from math import ceil, floor
+import os
 import pickle
 import threading
 import threading
@@ -29,7 +31,7 @@ class ResultsCompilationStep:
     iterations: int
     epsilon: float
     did_converge: bool
-    node_positions: list[tuple[float, float, float]]
+    node_positions: np.ndarray
     variable_values: list
 
 
@@ -101,6 +103,126 @@ class ResultsCompilation:
         return headers, table_rows
 
 
+def _evaluate_model_variables(result: SolverResult, scene_state: SceneState, variable_names: list[str]) -> dict[str, float]:
+    """Evaluate all model variables against the solved scene state."""
+
+    evaluated_values: dict[str, float] = {}
+
+    position_id_map = get_position_id_map(result, scene_state)
+
+    for column_name, model_variable in zip(variable_names, scene_state.model_variables):
+        try:
+            value = float(model_variable.variable.evaluate(position_id_map))
+            evaluated_values[column_name] = value
+        except Exception:
+            evaluated_values[column_name] = None
+
+    return evaluated_values
+
+
+def _solve_at_time(motion_variables: list[MotionVariableData], time_value: float, scene_state: SceneState, solver_kwargs: dict) -> SolverResult:
+    """Build a solver state for the requested time and solve it without console output."""
+    t0 = perf_counter()
+
+    nodes = np.array([node.world_position for node in scene_state.nodes])
+    groups = [[scene_state.nodes.index(node) for node in group.nodes] for group in scene_state.groups]
+
+    displacements: list[tuple[int, np.ndarray]] = []
+    links: list[tuple[int, int, float]] = []
+    motion_variables_by_id = {variable.id: variable for variable in motion_variables}
+
+    for element in scene_state.model_variables:
+        variable = element.variable
+
+        motion_variable = motion_variables_by_id.get(str(variable.id))
+        if motion_variable is None or not motion_variable.is_input:
+            continue
+
+        sampled_value = motion_variable.sample_at(time_value)
+        if sampled_value is None:
+            continue
+
+        if isinstance(variable, DisplacementVariable):
+            node = variable.node
+            if node is not None:
+                displacements.append((scene_state.nodes.index(node), variable.get_displacement(sampled_value)))
+        elif isinstance(variable, DistanceVariable):
+            node_a = variable.node_a
+            node_b = variable.node_b
+            if node_a is not None and node_b is not None:
+                links.append((scene_state.nodes.index(node_a), scene_state.nodes.index(node_b), sampled_value))
+
+    t1 = perf_counter()
+    # print(f"Time taken to prepare solver state: {t1 - t0:.6f} seconds")
+
+    solver_state = SolverState.from_connections(
+        nodes=nodes,
+        node_groups=groups,
+        displacements=displacements,
+        extra_links=links,
+    )
+
+    t2 = perf_counter()
+    # print(f"Time taken to create solver state: {t2 - t1:.6f} seconds")
+
+    result = solve_system(solver_state, **solver_kwargs)
+
+    t3 = perf_counter()
+    # print(f"Time taken to solve system: {t3 - t2:.6f} seconds")
+
+    return result
+
+@dataclass
+class StepCompilationData:
+    times: np.ndarray
+    motion_profile: MotionData
+    variable_columns: list[str]
+    scene_state_dict: dict
+    solver_kwargs: dict
+
+def _compile_step_task(data: StepCompilationData):
+    t_start = perf_counter()
+    scene_state = SceneState.from_dict(data.scene_state_dict)
+
+    steps = []
+    precision_digits = 16
+
+    cum_solver_time = 0.0
+    cum_eval_time = 0.0
+
+    for time in data.times:
+        t0 = perf_counter()
+        solver_result = _solve_at_time(data.motion_profile.variables, time, scene_state, data.solver_kwargs)
+        t1 = perf_counter()
+        cum_solver_time += t1 - t0
+
+        t0 = perf_counter()
+        variable_value_dict = _evaluate_model_variables(solver_result, scene_state, data.variable_columns)
+        variable_values = [variable_value_dict[col] for col in data.variable_columns]
+
+        step = (
+            ResultsCompilationStep(
+                time=time,
+                error=solver_result.error,
+                iterations=solver_result.iterations,
+                epsilon=solver_result.epsilon,
+                did_converge=solver_result.did_converge,
+                node_positions=solver_result.node_positions,
+                variable_values=variable_values,
+            )
+        )
+
+        precision_digits = min(precision_digits, solver_result.precision_digits)
+
+        steps.append(step)
+
+        t1 = perf_counter()
+        cum_eval_time += t1 - t0
+
+    t_end = perf_counter()
+    return steps, precision_digits, (cum_solver_time, cum_eval_time, t_end - t_start)
+
+
 # 1. Create a lightweight signal bridge
 class ThreadBridge(QObject):
     # This signal carries the final object back to the main thread
@@ -142,7 +264,7 @@ class ResultsCompiler:
         motion_profile.sync_from_scene_state(self.scene_state)
 
         times = self.get_times()
-        variable_columns = self._build_variable_columns()
+        variable_names = self._build_variable_columns()
 
         steps: list[ResultsCompilationStep] = []
 
@@ -154,56 +276,99 @@ class ResultsCompiler:
         progress_index = 0
         PROGRESS_TEXT = "1....2....3....4....5....6....7....8....9....!"
 
-        print("Solving: ", end="", flush=True)
+        # print("Solving: ", end="", flush=True)
+        print("Solving...")
 
         solving_time_sum = 0.0
 
+        scene_state_dict = self.scene_state.to_dict()
+
         t0 = perf_counter()
-        for time_value in times:
-            current_step += 1
 
-            solver_result = self._solve_at_time(motion_profile.variables, float(time_value))
-            node_positions = get_solved_node_positions(solver_result).tolist()
-            variable_value_dict = self._evaluate_model_variables(solver_result)
-            variable_values = [variable_value_dict[col] for col in variable_columns]
+        copy_motion_profile = MotionData.from_dict(motion_profile.to_dict())
 
-            solving_time_sum += solver_result.time
+        SYNCHRONOUS = True
+        MAX_WORKERS = 4
 
-            steps.append(
-                ResultsCompilationStep(
-                    time=time_value,
-                    error=solver_result.error,
-                    iterations=solver_result.iterations,
-                    epsilon=solver_result.epsilon,
-                    did_converge=solver_result.did_converge,
-                    node_positions=node_positions,
-                    variable_values=variable_values,
-                )
+        chunk_size = max(40, ceil(len(times) / MAX_WORKERS))
+
+        step_data = [
+            StepCompilationData(
+                times = times[i:i + chunk_size],
+                motion_profile = copy_motion_profile,
+                variable_columns = variable_names,
+                scene_state_dict = scene_state_dict,
+                solver_kwargs = self.solver_kwargs
             )
+            for i in range(0, len(times), chunk_size)
+        ]
 
-            precision_digits = min(precision_digits, solver_result.precision_digits)
+        print("time ranges:")
+        for data in step_data:
+            print(f"  {data.times[0]} to {data.times[-1]}")
 
-            # print(f"Completed {current_step}/{total_steps}")
-            while progress_index <= (len(PROGRESS_TEXT)-1)*current_step/total_steps:
-                print(PROGRESS_TEXT[progress_index], end="", flush=True)
-                progress_index += 1
+        if SYNCHRONOUS:
+            data = StepCompilationData(
+                times=times,
+                motion_profile=copy_motion_profile,
+                variable_columns=variable_names,
+                scene_state_dict=scene_state_dict,
+                solver_kwargs=self.solver_kwargs
+            )
+            some_steps, precision, output_times = _compile_step_task(data)
+            print("Solver time: {:.3f} seconds, eval time: {:.3f} seconds, total time: {:.3f} seconds".format(output_times[0], output_times[1], output_times[2]))
+            steps.extend(some_steps)
+            precision_digits = min(precision_digits, precision)
+        else:
+            with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                t01 = perf_counter()
+                futures = [
+                    executor.submit(_compile_step_task, data)
+                    for data in step_data
+                ]
+
+                print(f"Submitted {len(futures)} futures, with {len(executor._processes)} processors", flush=True)
+                t02 = perf_counter()
+                print(f"Time to submit futures: {t02 - t01:.3f} seconds")
+
+                wait(futures)
+                t03 = perf_counter()
+                print(f"Time to wait for futures: {t03 - t02:.3f} seconds")
+
+                print("Done waiting for futures...", flush=True)
+                for future in futures:
+                    print("Processing future result...", flush=True)
+                    try:
+                        some_steps, precision, times = future.result()
+                        print("Solver time: {:.3f} seconds, eval time: {:.3f} seconds, total time: {:.3f} seconds".format(times[0], times[1], times[2]))
+                        steps.extend(some_steps)
+                        precision_digits = min(precision_digits, precision)
+                    except Exception as e:
+                        print(f"Error processing future result: {e}")
+                        continue
+                t04 = perf_counter()
+                print(f"Time to process all future results: {t04 - t03:.3f} seconds")
+
+        steps.sort(key=lambda x: x.time)
 
         t1 = perf_counter()
         print("\nDone compiling results in {:.3f} seconds ({:.3f} solving)".format(t1 - t0, solving_time_sum))
 
-        return ResultsCompilation(
-            base_scene=self.scene_state,
-            variable_names=variable_columns,
-            steps=steps,
-            precision_digits=precision_digits
-        )
-    
+        
+        return variable_names, steps, precision_digits
+
     def compile(self, completed: Callable[[ResultsCompilation], None]):
         bridge = ThreadBridge()
         bridge.compilation_ready.connect(completed)
 
         def func():
-            result = self._compile()
+            variable_names, steps, precision_digits = self._compile()
+            result = ResultsCompilation(
+                base_scene=self.scene_state,
+                variable_names=variable_names,
+                steps=steps,
+                precision_digits=precision_digits
+            )
             bridge.compilation_ready.emit(result)
 
         thread = threading.Thread(target=func)
@@ -287,24 +452,11 @@ class ResultsCompiler:
 
         return solve_system(solver_state, **self.solver_kwargs)
 
-
-def get_solved_node_positions(result: SolverResult) -> np.ndarray:
-    """Creates a numpy array containing the node positions, ordered by their original index."""
-
-    positions_by_index: dict[int, list[np.ndarray]] = {}
-    for group in result.system_state.groups:
-        for node in group.nodes:
-            positions_by_index.setdefault(node.index, []).append(np.array(node.get_world_position(), dtype=float))
-
-    positions = [np.mean(positions, axis=0) for _, positions in sorted(positions_by_index.items())]
-
-    return np.array(positions)
-
 def get_position_id_map(result: SolverResult, scene_state: SceneState) -> dict[UUID, np.ndarray]:
     """Creates a map of node indices to their solved positions."""
 
     position_id_map: dict[UUID, np.ndarray] = {}
-    positions = get_solved_node_positions(result)
+    positions = result.node_positions
 
     for i in range(len(positions)):
         position_id_map[scene_state.nodes[i].id] = positions[i]

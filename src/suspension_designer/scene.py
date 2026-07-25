@@ -150,7 +150,7 @@ class SceneState(QObject):
         for i, node in enumerate(self.nodes):
             if 0 <= i < len(node_positions):
                 node.world_position = node_positions[i]
-        print("Updated node positions")
+        # print("Updated node positions")
 
     def strip_reference(self) -> 'SceneState':
         # Create a new instance without any reference geometry

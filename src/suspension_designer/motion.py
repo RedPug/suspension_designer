@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
 	QWidget,
 )
 
-from suspension_designer.model_variables import ModelVariableElement
 from suspension_designer.scene import SceneState
 
 
