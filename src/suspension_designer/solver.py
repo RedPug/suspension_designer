@@ -438,7 +438,7 @@ def _apply_linkages(system_state: SolverState, easing_factor, max_iterations, ep
     # print(f"Reached max iterations with error: {error:.6f}")
     return np.array(errors), iterations, did_converge
 
-def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=1000, epsilon=(1e-9)/2, rotation_strength=0.5)-> SolverResult:
+def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=1000, epsilon=(1e-8)/2, rotation_strength=0.5)-> SolverResult:
     """Iteratively solve for the positions of all groups based on the linkage constraints.
 
     Args:
@@ -457,9 +457,15 @@ def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=10
 
     # print(f"Solved system in {t1-t0:.4f} seconds")
 
+    positions_by_index: dict[int, list[np.ndarray]] = {}
+    for group in system_copy.groups:
+        for node in group.nodes:
+            positions_by_index.setdefault(node.index, []).append(np.array(node.get_world_position(system_copy.groups), dtype=float))
+
+    positions = [np.mean(positions, axis=0) for _, positions in sorted(positions_by_index.items())]
+
     return SolverResult(
-        system_state=system_copy,
-        error=errors[-1],
+        node_positions=positions,
         errors=errors,
         iterations=iterations,
         epsilon=epsilon,
@@ -467,70 +473,74 @@ def solve_system(system_state: SolverState, easing_factor=1.4, max_iterations=10
         did_converge=did_converge)
 
 
-def solve(scene_state: SceneState, motion_variables: list[MotionVariableData], t: float = 0.0, **kwargs) -> SolverResult:
-    current_state = scene_state
+# def solve(scene_state: SceneState, motion_variables: list[MotionVariableData], t: float = 0.0, **kwargs) -> SolverResult:
+#     t0 = time.perf_counter()
+#     current_state = scene_state
 
-    nodes = np.array([n.world_position for n in current_state.nodes])
+#     nodes = np.array([n.world_position for n in current_state.nodes])
 
-    groups = [[current_state.nodes.index(n) for n in group.nodes] for group in current_state.groups]
+#     groups = [[current_state.nodes.index(n) for n in group.nodes] for group in current_state.groups]
 
-    displacements: list[tuple[int, np.ndarray]] = []
-    motion_variables_by_id = {variable.id: variable for variable in motion_variables}
+#     displacements: list[tuple[int, np.ndarray]] = []
+#     links: list[Linkage] = []
+#     motion_variables_by_id = {variable.id: variable for variable in motion_variables}
 
-    # print("model_variables:", current_state.model_variables)
+#     # print("model_variables:", current_state.model_variables)
 
-    for element in current_state.model_variables:
-        variable = element.variable
+#     for element in current_state.model_variables:
+#         variable = element.variable
 
-        motion_variable = motion_variables_by_id.get(str(variable.id))
-        if motion_variable is None or not motion_variable.is_input:
-            continue
+#         motion_variable = motion_variables_by_id.get(str(variable.id))
+#         if motion_variable is None or not motion_variable.is_input:
+#             continue
 
-        sampled_value = motion_variable.sample_at(t)
-        if sampled_value is None:
-            print(f"Skipping variable {variable.name} at time {t} because it has no sampled value.")
-            continue
+#         sampled_value = motion_variable.sample_at(t)
+#         if sampled_value is None:
+#             print(f"Skipping variable {variable.name} at time {t} because it has no sampled value.")
+#             continue
 
-        if isinstance(variable, DisplacementVariable):
-            node = variable.node
-            if node is not None:
-                displacements.append((current_state.nodes.index(node), variable.get_displacement(sampled_value)))
-            else:
-                print(f"Skipping variable {variable.name} at time {t} because its node is None.")
+#         if isinstance(variable, DisplacementVariable):
+#             node = variable.node
+#             if node is not None:
+#                 displacements.append((current_state.nodes.index(node), variable.get_displacement(sampled_value)))
+#             else:
+#                 print(f"Skipping variable {variable.name} at time {t} because its node is None.")
     
-    links: list[Linkage] = []
-    for variable in current_state.model_variables:
-        motion_variable = motion_variables_by_id.get(str(variable.id))
-        if motion_variable is None or not motion_variable.is_input:
-            continue
-
-        sampled_value = motion_variable.sample_at(t)
-        if sampled_value is None:
-            print(f"Skipping variable {variable.name} at time {t} because it has no sampled value.")
-            continue
-
-        if isinstance(variable, DistanceVariable):
-            node1 = current_state.nodes.index(variable.node1)
-            node2 = current_state.nodes.index(variable.node2)
-            if node1 is not None and node2 is not None:
-                links.append((node1, node2, sampled_value))
-
-    solver_state = SolverState.from_connections(
-        nodes=nodes,
-        node_groups=groups,
-        displacements=displacements,
-        extra_links=links)
     
-    solver_state.groups[0].locked = True
+#     for variable in current_state.model_variables:
+#         motion_variable = motion_variables_by_id.get(str(variable.id))
+#         if motion_variable is None or not motion_variable.is_input:
+#             continue
+
+#         sampled_value = motion_variable.sample_at(t)
+#         if sampled_value is None:
+#             print(f"Skipping variable {variable.name} at time {t} because it has no sampled value.")
+#             continue
+
+#         if isinstance(variable, DistanceVariable):
+#             node1 = current_state.nodes.index(variable.node1)
+#             node2 = current_state.nodes.index(variable.node2)
+#             if node1 is not None and node2 is not None:
+#                 links.append((node1, node2, sampled_value))
+
+#     t1 = time.perf_counter()
+#     print(f"Time taken to prepare solver state: {t1 - t0:.2f} seconds")
+
+#     solver_state = SolverState.from_connections(
+#         nodes=nodes,
+#         node_groups=groups,
+#         displacements=displacements,
+#         extra_links=links)
+
+#     t2 = time.perf_counter()
+#     print(f"Time taken to create solver state: {t2 - t1:.2f} seconds")
     
-    result = solve_system(solver_state, **kwargs)
-    print(result)
+#     solver_state.groups[0].locked = True
+    
+#     result = solve_system(solver_state, **kwargs)
+#     t3 = time.perf_counter()
+#     print(f"Time taken to solve system: {t3 - t2:.2f} seconds")
+#     print(f"Total time taken: {t3 - t0:.2f} seconds")
+#     print(result)
 
-    return result
-
-def solve_multiple(scene_state: SceneState, motion_variables: list[MotionVariableData], times: np.ndarray, **kwargs):
-    results = []
-    for t in times:
-        result = solve(scene_state, motion_variables, t, **kwargs)
-        results.append(result)
-    return results
+#     return result
