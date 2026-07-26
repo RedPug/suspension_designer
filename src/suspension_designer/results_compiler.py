@@ -19,7 +19,7 @@ from PySide6.QtCore import QObject, QTimer, Signal, Signal
 from suspension_designer.model_variables import DisplacementVariable, DistanceVariable
 from suspension_designer.motion import MotionData, MotionVariableData
 from suspension_designer.scene import SceneState
-from suspension_designer.solver import SolverResult, SolverState, solve_system
+from suspension_designer.solver import Solver, SolverResult
 
 
 @dataclass
@@ -155,17 +155,26 @@ def _solve_at_time(motion_variables: list[MotionVariableData], time_value: float
     t1 = perf_counter()
     # print(f"Time taken to prepare solver state: {t1 - t0:.6f} seconds")
 
-    solver_state = SolverState.from_connections(
+    solver = Solver.from_connections(
         nodes=nodes,
         node_groups=groups,
         displacements=displacements,
-        extra_links=links,
+        links=links,
     )
+
+    # solver_state = SolverState.from_connections(
+    #     nodes=nodes,
+    #     node_groups=groups,
+    #     displacements=displacements,
+    #     extra_links=links,
+    # )
+
 
     t2 = perf_counter()
     # print(f"Time taken to create solver state: {t2 - t1:.6f} seconds")
 
-    result = solve_system(solver_state, **solver_kwargs)
+    result = solver.solve(**solver_kwargs)
+    # result = solve_system(solver_state, **solver_kwargs)
 
     t3 = perf_counter()
     # print(f"Time taken to solve system: {t3 - t2:.6f} seconds")
@@ -394,63 +403,6 @@ class ResultsCompiler:
                 columns.append(f"{base_name} ({str(variable.id)[:8]})")
 
         return columns
-
-    def _evaluate_model_variables(self, result: SolverResult) -> dict[str, Any]:
-        """Evaluate all model variables against the solved scene state."""
-
-        evaluated_values: dict[str, Any] = {}
-        columns = self._build_variable_columns()
-
-        position_id_map = get_position_id_map(result, self.scene_state)
-
-        for column_name, model_variable in zip(columns, self.scene_state.model_variables):
-            try:
-                value = float(model_variable.variable.evaluate(position_id_map))
-                evaluated_values[column_name] = value
-            except Exception:
-                evaluated_values[column_name] = None
-
-        return evaluated_values
-
-    def _solve_at_time(self, motion_variables: list[MotionVariableData], time_value: float) -> SolverResult:
-        """Build a solver state for the requested time and solve it without console output."""
-
-        nodes = np.array([node.world_position for node in self.scene_state.nodes])
-        groups = [[self.scene_state.nodes.index(node) for node in group.nodes] for group in self.scene_state.groups]
-
-        displacements: list[tuple[int, np.ndarray]] = []
-        links: list[tuple[int, int, float]] = []
-        motion_variables_by_id = {variable.id: variable for variable in motion_variables}
-
-        for element in self.scene_state.model_variables:
-            variable = element.variable
-
-            motion_variable = motion_variables_by_id.get(str(variable.id))
-            if motion_variable is None or not motion_variable.is_input:
-                continue
-
-            sampled_value = motion_variable.sample_at(time_value)
-            if sampled_value is None:
-                continue
-
-            if isinstance(variable, DisplacementVariable):
-                node = variable.node
-                if node is not None:
-                    displacements.append((self.scene_state.nodes.index(node), variable.get_displacement(sampled_value)))
-            elif isinstance(variable, DistanceVariable):
-                node_a = variable.node_a
-                node_b = variable.node_b
-                if node_a is not None and node_b is not None:
-                    links.append((self.scene_state.nodes.index(node_a), self.scene_state.nodes.index(node_b), sampled_value))
-
-        solver_state = SolverState.from_connections(
-            nodes=nodes,
-            node_groups=groups,
-            displacements=displacements,
-            extra_links=links,
-        )
-
-        return solve_system(solver_state, **self.solver_kwargs)
 
 def get_position_id_map(result: SolverResult, scene_state: SceneState) -> dict[UUID, np.ndarray]:
     """Creates a map of node indices to their solved positions."""

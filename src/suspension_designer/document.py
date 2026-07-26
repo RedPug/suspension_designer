@@ -32,7 +32,7 @@ from suspension_designer.properties import Property, StringPropertyType
 from suspension_designer.rendering import Viewport3D
 from suspension_designer.motion import MotionData, MotionTableWidget
 from suspension_designer.result_viewer import ResultViewer
-from suspension_designer.solver import SolverResult
+from suspension_designer.solver_deprecated import SolverResult
 from suspension_designer.selection import SelectionManager, Selectable
 from suspension_designer.scene import SceneState
 from suspension_designer.tree_model import SceneTreeModel

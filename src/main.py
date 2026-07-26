@@ -1,14 +1,41 @@
 import os
+import threading
+import numpy as np
+
+from PySide6.QtWidgets import QApplication
 
 from suspension_designer.document import Document
 from suspension_designer.graphics import MainWindow
-from PySide6.QtWidgets import QApplication
 from suspension_designer.settings import SettingsManager
+from suspension_designer.solver import Solver
+
+def _background_compiler_warmup():
+    """Trigger compilation on a secondary thread with dummy data."""
+    try:
+        # 1. Create a minimal dummy dataset matching your exact structure shapes
+        dummy_nodes = np.array([[0,0,0],[1,0,0]], dtype=np.float64)
+        dummy_groups = [[0,1]]
+        dummy_linkages = []
+        dummy_displacements = []
+        
+        # 2. Instantiate and run the solver once
+        solver = Solver.from_connections(
+            dummy_nodes, dummy_groups, dummy_linkages, dummy_displacements
+        )
+        # This will silently compile the class methods in the background
+        solver.solve(max_iterations=1)
+        print("Numba Solver background compilation complete!")
+    except Exception as e:
+        print(f"Failed to background compile: {e}")
 
 
 if __name__ == "__main__":
 
     print("Starting...")
+
+    # --- Call this right when your application main() starts up ---
+    warmup_thread = threading.Thread(target=_background_compiler_warmup, daemon=True)
+    warmup_thread.start()
 
     SettingsManager.read()
 

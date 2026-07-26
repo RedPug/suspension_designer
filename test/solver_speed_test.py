@@ -2,18 +2,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from suspension_designer.document import Document, MotionDocument
-from suspension_designer.solver_deprecated import solve
+from suspension_designer.solver import solve_at_time
+from suspension_designer.solver_deprecated import solve as old_solve
 
 doc: MotionDocument = Document.load("./user_data/my_motion.proj")
-print(doc)
-
 
 fig, ax = plt.subplots()
 
-for easing in np.arange(0.1, 1.7 + 0.1, 0.1):
-    result = solve(doc.scene_state, doc.motion_data.variables, t=0.0, easing_factor=easing, max_iterations=1e4, epsilon=1e-9)
-    ax.plot(np.arange(len(result.errors)), result.errors, '-', label=f"Easing: {easing:.2f}")
 
+result_new = solve_at_time(
+    doc.motion_data.variables,
+    time_value=0.0,
+    scene_state=doc.scene_state)
+
+ax.plot(result_new.errors, label="New")
+
+result_old = old_solve(doc.scene_state, doc.motion_data.variables, t=0.0)
+
+ax.plot(result_old.errors, label="old")
+    
 ax.set_yscale('log')
 ax.set_xscale('log')
 ax.set_ylabel('Error (log scale)')

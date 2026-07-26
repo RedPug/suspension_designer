@@ -57,7 +57,20 @@ def quat_from_matrix(m):
 # @njit(float64[:](float64[:], float64[:]))
 def quaternion_from_direction(direction: np.ndarray, up: np.ndarray = np.array([0.0, 1.0, 0.0])) -> np.ndarray:
     """Creates a quaternion that represents the rotation from the world forward vector to the given direction."""
-    direction = direction / np.linalg.norm(direction)
+    direction_norm = np.linalg.norm(direction)
+    if direction_norm < 1e-12:
+        # Undefined orientation for zero direction; return identity rotation.
+        return np.array([1.0, 0.0, 0.0, 0.0])
+
+    direction = direction / direction_norm
+
+    up_norm = np.linalg.norm(up)
+    up = up / up_norm if up_norm > 1e-12 else np.array([0.0, 1.0, 0.0])
+
+    # If up is nearly parallel to direction, pick a stable fallback up axis.
+    if np.abs(np.dot(up, direction)) > 0.999:
+        up = np.array([1.0, 0.0, 0.0]) if np.abs(direction[0]) < 0.9 else np.array([0.0, 0.0, 1.0])
+
     right = np.cross(up, direction)
     right /= np.linalg.norm(right)
     up_corrected = np.cross(direction, right)
@@ -69,3 +82,44 @@ def quaternion_from_direction(direction: np.ndarray, up: np.ndarray = np.array([
     ])
 
     return quat_from_matrix(rotation_matrix)
+
+@njit(inline='always')
+def mat_t_vec(M, v):
+    """Multiplies a 3x3 matrix (transposed) by a vector.
+    """
+    return np.array([
+        M[0,0]*v[0] + M[1,0]*v[1] + M[2,0]*v[2],
+        M[0,1]*v[0] + M[1,1]*v[1] + M[2,1]*v[2],
+        M[0,2]*v[0] + M[1,2]*v[1] + M[2,2]*v[2]
+    ])
+
+@njit(inline='always')
+def mat_vec(M, v):
+    """Multiplies a 3x3 matrix by a vector.
+    """
+    return np.array([
+        M[0,0]*v[0] + M[0,1]*v[1] + M[0,2]*v[2],
+        M[1,0]*v[0] + M[1,1]*v[1] + M[1,2]*v[2],
+        M[2,0]*v[0] + M[2,1]*v[1] + M[2,2]*v[2]
+    ])
+
+@njit(inline='always')
+def mat_mat(M1, M2):
+    """Multiplies two 3x3 matrices."""
+    return np.array([
+        [
+            M1[0,0]*M2[0,0] + M1[0,1]*M2[1,0] + M1[0,2]*M2[2,0],
+            M1[0,0]*M2[0,1] + M1[0,1]*M2[1,1] + M1[0,2]*M2[2,1],
+            M1[0,0]*M2[0,2] + M1[0,1]*M2[1,2] + M1[0,2]*M2[2,2]
+        ],
+        [
+            M1[1,0]*M2[0,0] + M1[1,1]*M2[1,0] + M1[1,2]*M2[2,0],
+            M1[1,0]*M2[0,1] + M1[1,1]*M2[1,1] + M1[1,2]*M2[2,1],
+            M1[1,0]*M2[0,2] + M1[1,1]*M2[1,2] + M1[1,2]*M2[2,2]
+        ],
+        [
+            M1[2,0]*M2[0,0] + M1[2,1]*M2[1,0] + M1[2,2]*M2[2,0],
+            M1[2,0]*M2[0,1] + M1[2,1]*M2[1,1] + M1[2,2]*M2[2,1],
+            M1[2,0]*M2[0,2] + M1[2,1]*M2[1,2] + M1[2,2]*M2[2,2]
+        ],
+    ])
