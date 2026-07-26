@@ -124,6 +124,7 @@ class Document(Selectable):
 
     @staticmethod
     def load(filepath: str) -> 'Document':
+        filepath = os.path.abspath(filepath)
         try:
             with open(filepath, "r") as f:
                 data = json.load(f)
@@ -150,6 +151,7 @@ class Document(Selectable):
 
         elif type == "motion":
             motion_data = doc_data.get("motion_data")
+
             document = MotionDocument(
                 name=name,
                 filepath=filepath,
@@ -244,7 +246,8 @@ class MotionDocument(Document):
     def __init__(self, name: str, filepath: str = None, scene_state: SceneState = None, motion_data: MotionData | dict | None = None, editor_filepath: str | None = None):
         super().__init__(name, filepath)
         self.scene_state = scene_state
-        self.editor_filepath = editor_filepath
+        self.editor_rel_filepath = editor_filepath
+        self.editor_filepath = os.path.join(os.path.dirname(filepath), editor_filepath)
 
         if isinstance(motion_data, MotionData):
             self.motion_data = motion_data
@@ -347,7 +350,7 @@ class MotionDocument(Document):
             filepath,
             {
                 "motion_data": self.motion_data.to_dict(),
-                "editor_filepath": self.editor_filepath,
+                "editor_filepath": self.editor_rel_filepath,
             },
             type="motion",
         ):

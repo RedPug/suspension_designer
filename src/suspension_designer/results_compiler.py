@@ -19,7 +19,7 @@ from PySide6.QtCore import QObject, QTimer, Signal, Signal
 from suspension_designer.model_variables import DisplacementVariable, DistanceVariable
 from suspension_designer.motion import MotionData, MotionVariableData
 from suspension_designer.scene import SceneState
-from suspension_designer.solver import Solver, SolverResult
+from suspension_designer.solver import solve_at_time, SolverResult
 
 
 @dataclass
@@ -120,67 +120,6 @@ def _evaluate_model_variables(result: SolverResult, scene_state: SceneState, var
     return evaluated_values
 
 
-def _solve_at_time(motion_variables: list[MotionVariableData], time_value: float, scene_state: SceneState, solver_kwargs: dict) -> SolverResult:
-    """Build a solver state for the requested time and solve it without console output."""
-    t0 = perf_counter()
-
-    nodes = np.array([node.world_position for node in scene_state.nodes])
-    groups = [[scene_state.nodes.index(node) for node in group.nodes] for group in scene_state.groups]
-
-    displacements: list[tuple[int, np.ndarray]] = []
-    links: list[tuple[int, int, float]] = []
-    motion_variables_by_id = {variable.id: variable for variable in motion_variables}
-
-    for element in scene_state.model_variables:
-        variable = element.variable
-
-        motion_variable = motion_variables_by_id.get(str(variable.id))
-        if motion_variable is None or not motion_variable.is_input:
-            continue
-
-        sampled_value = motion_variable.sample_at(time_value)
-        if sampled_value is None:
-            continue
-
-        if isinstance(variable, DisplacementVariable):
-            node = variable.node
-            if node is not None:
-                displacements.append((scene_state.nodes.index(node), variable.get_displacement(sampled_value)))
-        elif isinstance(variable, DistanceVariable):
-            node_a = variable.node_a
-            node_b = variable.node_b
-            if node_a is not None and node_b is not None:
-                links.append((scene_state.nodes.index(node_a), scene_state.nodes.index(node_b), sampled_value))
-
-    t1 = perf_counter()
-    # print(f"Time taken to prepare solver state: {t1 - t0:.6f} seconds")
-
-    solver = Solver.from_connections(
-        nodes=nodes,
-        node_groups=groups,
-        displacements=displacements,
-        links=links,
-    )
-
-    # solver_state = SolverState.from_connections(
-    #     nodes=nodes,
-    #     node_groups=groups,
-    #     displacements=displacements,
-    #     extra_links=links,
-    # )
-
-
-    t2 = perf_counter()
-    # print(f"Time taken to create solver state: {t2 - t1:.6f} seconds")
-
-    result = solver.solve(**solver_kwargs)
-    # result = solve_system(solver_state, **solver_kwargs)
-
-    t3 = perf_counter()
-    # print(f"Time taken to solve system: {t3 - t2:.6f} seconds")
-
-    return result
-
 @dataclass
 class StepCompilationData:
     times: np.ndarray
@@ -201,7 +140,7 @@ def _compile_step_task(data: StepCompilationData):
 
     for time in data.times:
         t0 = perf_counter()
-        solver_result = _solve_at_time(data.motion_profile.variables, time, scene_state, data.solver_kwargs)
+        solver_result = solve_at_time(data.motion_profile.variables, time, scene_state, **data.solver_kwargs)
         t1 = perf_counter()
         cum_solver_time += t1 - t0
 

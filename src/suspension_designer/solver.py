@@ -28,7 +28,7 @@ class SolverResult:
         return int(np.floor(-np.log10(self.epsilon)))
 
     def __str__(self):
-        return f"SolverResult(error={self.error:.6f}, iterations={self.iterations}, did_converge={self.did_converge}, time={self.time:.4f}s)"
+        return f"SolverResult(error={self.error:.6e}, iterations={self.iterations}, did_converge={self.did_converge}, time={self.time:.4f}s)"
 
 @njit(cache=True)
 def _get_node_pos(nodes, group_pos, group_rot, node_index: int, group_index: int) -> np.ndarray:
@@ -349,7 +349,7 @@ class Solver:
             displacements=disps,
         )
 
-    
+
 def solve_at_time(motion_variables: list[MotionVariableData], time_value: float, scene_state: SceneState, **solver_kwargs: dict) -> SolverResult:
     """Build a solver state for the requested time and solve it without console output."""
     t0 = perf_counter()
