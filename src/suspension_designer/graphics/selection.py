@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 
 from PySide6.QtCore import (QObject, Signal)
 
-from suspension_designer.properties import Property
+from suspension_designer.graphics.properties import Property
 
 class Selectable(QObject):
     did_change = Signal()

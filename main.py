@@ -6,13 +6,13 @@ import os
 import numpy as np
 
 # from src.scene import Scene
-from suspension_designer.document import Document, EditorDocument
+from suspension_designer.graphics.document import Document, EditorDocument
 # from src.structures import DisplacementVariable, SceneState, solve
-from suspension_designer.graphics import MainWindow
+from suspension_designer.editor.graphics import MainWindow
 from PySide6.QtWidgets import QApplication
 import matplotlib.pyplot as plt
 # from src.math import mult_quaternions, get_rotation_matrix_from_quaternion
-from suspension_designer.document import MotionDocument
+from suspension_designer.graphics.document import MotionDocument
 
 # system_state = SolverState(groups=[chassis_group, upright_group, upper_group, lower_group], linkages=linkages1)
 nodes = np.array([

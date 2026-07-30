@@ -6,9 +6,9 @@ from numba import float64, int32, typed, types, njit
 from typing import Any, Literal
 
 from suspension_designer.math import get_rotation_matrix_from_quaternion, mat_mat, mat_t_vec, mat_vec
-from suspension_designer.model_variables import DisplacementVariable, DistanceVariable
-from suspension_designer.motion import MotionVariableData
-from suspension_designer.scene import SceneState
+from suspension_designer.solver.model_variables import DisplacementVariable, DistanceVariable
+from suspension_designer.solver.motion import MotionVariableData
+from suspension_designer.editor.scene import SceneState
 
 # used for some typing, defines a contiguous (C) array rather than default (A)
 array_1d_c = types.Array(dtype=float64, ndim=1, layout='C')

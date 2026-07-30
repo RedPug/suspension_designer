@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from suspension_designer.document import Document, MotionDocument
-from suspension_designer.solver import solve_at_time
-from suspension_designer.solver_deprecated import solve as old_solve
+from suspension_designer.graphics.document import Document, MotionDocument
+from suspension_designer.solver.solver import solve_at_time
+from suspension_designer.solver.solver_deprecated import solve as old_solve
 
 doc: MotionDocument = Document.load("./user_data/my_motion.proj")
 

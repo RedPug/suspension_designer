@@ -16,10 +16,10 @@ import numpy as np
 
 from PySide6.QtCore import QObject, QTimer, Signal, Signal
 
-from suspension_designer.model_variables import DisplacementVariable, DistanceVariable
-from suspension_designer.motion import MotionData, MotionVariableData
-from suspension_designer.scene import SceneState
-from suspension_designer.solver import solve_at_time, SolverResult
+from suspension_designer.solver.model_variables import DisplacementVariable, DistanceVariable
+from suspension_designer.solver.motion import MotionData, MotionVariableData
+from suspension_designer.editor.scene import SceneState
+from suspension_designer.solver.solver import solve_at_time, SolverResult
 
 
 @dataclass

@@ -4,10 +4,10 @@ import numpy as np
 
 from PySide6.QtWidgets import QApplication
 
-from suspension_designer.document import Document
-from suspension_designer.graphics import MainWindow
+from suspension_designer.graphics.document import Document
+from suspension_designer.editor.graphics import MainWindow
 from suspension_designer.settings import SettingsManager
-from suspension_designer.solver import Solver
+from suspension_designer.solver.solver import Solver
 
 def _background_compiler_warmup():
     """Trigger compilation on a secondary thread with dummy data."""

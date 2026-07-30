@@ -1,6 +1,6 @@
 from PySide6.QtCore import (QAbstractItemModel, QModelIndex, Qt)
 
-from suspension_designer.scene import SceneState
+from suspension_designer.editor.scene import SceneState
 
 
 class TreeItem:

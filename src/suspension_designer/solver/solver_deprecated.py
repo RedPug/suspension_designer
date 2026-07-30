@@ -3,11 +3,11 @@ from typing import List, Optional
 import numpy as np
 import time
 
-from suspension_designer.model_variables import DisplacementVariable, DistanceVariable
-from suspension_designer.scene import SceneState
-from suspension_designer.motion import MotionVariableData
+from suspension_designer.solver.model_variables import DisplacementVariable, DistanceVariable
+from suspension_designer.editor.scene import SceneState
+from suspension_designer.solver.motion import MotionVariableData
 from suspension_designer.math import get_rotation_matrix_from_quaternion, mult_quaternions
-from suspension_designer.solver import SolverResult
+from suspension_designer.solver.solver import SolverResult
 
 class Node:
 

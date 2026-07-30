@@ -7,8 +7,8 @@ from PySide6.QtCore import (QObject, Signal)
 
 import numpy as np
 
-from suspension_designer.model_variables import ModelVariableElement
-from suspension_designer.structures import EditorNode, NodeGroup, ReferencePlane
+from suspension_designer.solver.model_variables import ModelVariableElement
+from suspension_designer.editor.structures import EditorNode, NodeGroup, ReferencePlane
 
 
 class SceneState(QObject):

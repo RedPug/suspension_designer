@@ -28,14 +28,14 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QClipboard, QKeySequence
 
 
-from suspension_designer.properties import Property, StringPropertyType
-from suspension_designer.rendering import Viewport3D
-from suspension_designer.motion import MotionData, MotionTableWidget
-from suspension_designer.result_viewer import ResultViewer
-from suspension_designer.selection import SelectionManager, Selectable
-from suspension_designer.scene import SceneState
-from suspension_designer.tree_model import SceneTreeModel
-from suspension_designer.results_compiler import ResultsCompilation, ResultsCompiler
+from suspension_designer.graphics.properties import Property, StringPropertyType
+from suspension_designer.graphics.rendering import Viewport3D
+from suspension_designer.solver.motion import MotionData, MotionTableWidget
+from suspension_designer.solver.result_viewer import ResultViewer
+from suspension_designer.graphics.selection import SelectionManager, Selectable
+from suspension_designer.editor.scene import SceneState
+from suspension_designer.graphics.tree_model import SceneTreeModel
+from suspension_designer.solver.results_compiler import ResultsCompilation, ResultsCompiler
 from suspension_designer.data_manager import save_csv, save_json, get_filepath
 
 

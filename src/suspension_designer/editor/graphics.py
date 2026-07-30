@@ -19,11 +19,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtCore import QByteArray
 
-from suspension_designer.structures import EditorNode, NodeGroup, ReferencePlane
-from suspension_designer.model_variables import ModelVariableElement
-from suspension_designer.document import Document, DocumentManager
-from suspension_designer.rendering import Camera, Viewport3D
-from suspension_designer.docks import PropertiesDock, TreeDock
+from suspension_designer.editor.structures import EditorNode, NodeGroup, ReferencePlane
+from suspension_designer.solver.model_variables import ModelVariableElement
+from suspension_designer.graphics.document import Document, DocumentManager
+from suspension_designer.graphics.rendering import Camera, Viewport3D
+from suspension_designer.graphics.docks import PropertiesDock, TreeDock
 
 class TabBar(QTabBar):
     def __init__(self, main_window: 'MainWindow', document_manager: DocumentManager):
