@@ -246,8 +246,7 @@ class MotionDocument(Document):
     def __init__(self, name: str, filepath: str = None, scene_state: SceneState = None, motion_data: MotionData | dict | None = None, editor_filepath: str | None = None):
         super().__init__(name, filepath)
         self.scene_state = scene_state
-        self.editor_rel_filepath = editor_filepath
-        self.editor_filepath = os.path.join(os.path.dirname(filepath), editor_filepath)
+        self.editor_filepath = editor_filepath
 
         if isinstance(motion_data, MotionData):
             self.motion_data = motion_data
@@ -350,7 +349,7 @@ class MotionDocument(Document):
             filepath,
             {
                 "motion_data": self.motion_data.to_dict(),
-                "editor_filepath": self.editor_rel_filepath,
+                "editor_filepath": self.editor_filepath
             },
             type="motion",
         ):
@@ -476,8 +475,6 @@ class DocumentManager(QObject):
         if document not in self._documents:
             raise ValueError("Document not found in the manager.")
         
-        document.did_change.disconnect(lambda: self.document_changed.emit(document))
-        
         self._documents.remove(document)
         self.document_removed.emit(document)
 
@@ -491,6 +488,8 @@ class DocumentManager(QObject):
         if document.widget is not None:
             document.widget.deleteLater()  # Ensure the widget is properly deleted
             document.widget = None  # Clear the reference to the widget
+
+        document.deleteLater()
 
     def create_new_editor_document(self, name: str = "New Document"):
         new_doc = EditorDocument(name=name)
@@ -507,9 +506,9 @@ class DocumentManager(QObject):
             return
 
         motion_document = MotionDocument(
-        name=f"{editor_doc.name} Motion",
-        scene_state=editor_doc.scene_state,
-        editor_filepath=editor_doc.filepath,
+            name=f"{editor_doc.name} Motion",
+            scene_state=editor_doc.scene_state,
+            editor_filepath=editor_doc.filepath,
         )
 
         self.add_document(motion_document, select=True)

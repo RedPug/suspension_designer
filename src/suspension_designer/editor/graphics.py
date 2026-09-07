@@ -22,7 +22,7 @@ from PySide6.QtCore import QByteArray
 from suspension_designer.editor.structures import EditorNode, NodeGroup, ReferencePlane
 from suspension_designer.solver.model_variables import ModelVariableElement
 from suspension_designer.graphics.document import Document, DocumentManager
-from suspension_designer.graphics.rendering import Camera, Viewport3D
+from suspension_designer.graphics.rendering import Camera, CameraBasis, Viewport3D
 from suspension_designer.graphics.docks import PropertiesDock, TreeDock
 
 class TabBar(QTabBar):
@@ -144,7 +144,7 @@ class MenuBar(QMenuBar):
 
         new_editor_action = new_menu.addAction("Geometry Editor")
         new_editor_action.triggered.connect(lambda: self.document_manager.create_new_editor_document())
-        new_motion_action = new_menu.addAction("Motion")
+        new_motion_action = new_menu.addAction("Motion from Editor")
         new_motion_action.triggered.connect(lambda: self.document_manager.create_new_motion_document())
 
         save_action = file_menu.addAction("Save")
@@ -155,7 +155,6 @@ class MenuBar(QMenuBar):
         save_all_action.triggered.connect(self.document_manager.save_all)
         load_action = file_menu.addAction("Load")
         load_action.triggered.connect(self.document_manager.load)
-
 
         view_menu = self.addMenu("View")
 
@@ -179,27 +178,23 @@ class MenuBar(QMenuBar):
         view_menu.addAction(perspective_action)
         
         view_direction_menu = view_menu.addMenu("View Direction")
-        view_direction_menu.addAction("Front").triggered.connect(lambda: self.set_view_direction(np.array([0, 0, 1])))
-        view_direction_menu.addAction("Right").triggered.connect(lambda: self.set_view_direction(np.array([1, 0, 0])))
-        view_direction_menu.addAction("Top").triggered.connect(lambda: self.set_view_direction(np.array([0, 1, 0])))
-        view_direction_menu.addAction("Back").triggered.connect(lambda: self.set_view_direction(np.array([0, 0, -1])))
-        view_direction_menu.addAction("Left").triggered.connect(lambda: self.set_view_direction(np.array([-1, 0, 0])))
-        view_direction_menu.addAction("Bottom").triggered.connect(lambda: self.set_view_direction(np.array([0, -1, 0])))
+        view_direction_menu.addAction("Front").triggered.connect(lambda: self.set_view_direction(CameraBasis.FRONT, up=CameraBasis.UP))
+        view_direction_menu.addAction("Right").triggered.connect(lambda: self.set_view_direction(CameraBasis.RIGHT, up=CameraBasis.UP))
+        view_direction_menu.addAction("Top").triggered.connect(lambda: self.set_view_direction(CameraBasis.UP, up=CameraBasis.FRONT))
+        view_direction_menu.addAction("Back").triggered.connect(lambda: self.set_view_direction(CameraBasis.BACK, up=CameraBasis.UP))
+        view_direction_menu.addAction("Left").triggered.connect(lambda: self.set_view_direction(CameraBasis.LEFT, up=CameraBasis.UP))
+        view_direction_menu.addAction("Bottom").triggered.connect(lambda: self.set_view_direction(CameraBasis.DOWN, up=CameraBasis.FRONT))
         view_direction_menu.addSeparator()
-        view_direction_menu.addAction("Isometric").triggered.connect(lambda: self.set_view_direction(np.array([1,1,1]), up=np.array([0, 1, 0])))
-        view_direction_menu.addAction("Dimetric").triggered.connect(lambda: self.set_view_direction(np.array([0.333,0.333,0.882]), up=np.array([0, 1, 0])))
-        view_direction_menu.addAction("Trimetric").triggered.connect(lambda: self.set_view_direction(np.array([0.393, 0.518, 0.761]), up=np.array([0, 1, 0])))
+        view_direction_menu.addAction("Isometric").triggered.connect(lambda: self.set_view_direction(CameraBasis.ISOMETRIC, up=CameraBasis.UP))
+        view_direction_menu.addAction("Dimetric").triggered.connect(lambda: self.set_view_direction(CameraBasis.DIMETRIC, up=CameraBasis.UP))
+        view_direction_menu.addAction("Trimetric").triggered.connect(lambda: self.set_view_direction(CameraBasis.TRIMETRIC, up=CameraBasis.UP))
 
 
-        add_menu = self.addMenu("Add")
+        add_menu = self.addMenu("Insert")
         add_menu.addAction("Node").triggered.connect(lambda: self.add_node())
         add_menu.addAction("Plane").triggered.connect(lambda: self.add_reference_plane())
         add_menu.addAction("Group").triggered.connect(lambda: self.add_group())
         add_menu.addAction("Variable").triggered.connect(lambda: self.add_model_variable())
-
-
-        solve_menu = self.addMenu("Solve")
-        solve_menu.addAction("Solve System").triggered.connect(self.solve_system)
 
     def save_as_scene(self):
         pass
@@ -272,18 +267,6 @@ class MenuBar(QMenuBar):
 
     def add_model_variable(self):
         self.document_manager.current_document.scene_state.add_model_variable(ModelVariableElement())
-
-
-
-    def solve_system(self):
-        print("Solving system...")
-        result = self.document_manager.current_document.scene_manager.solve_system()
-        if result.did_converge:
-            print(f"System solved in {result.iterations} iterations with error {result.error:.6f}.")
-            self.parent().status_bar.showMessage(f"System solved in {result.iterations} iterations with error {result.error:.6f}.", 5000)
-        else:
-            print(f"System did not converge after {result.iterations} iterations. Final error: {result.error:.6f}.")
-            self.parent().status_bar.showMessage(f"System did not converge after {result.iterations} iterations. Final error: {result.error:.6f}.", 5000)
 
 class StatusBar(QStatusBar):
     def __init__(self, parent=None):

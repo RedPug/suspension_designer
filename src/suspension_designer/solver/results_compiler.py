@@ -85,16 +85,14 @@ class ResultsCompilation:
 
 
     def to_table(self) -> tuple[list[str], list[list[str]]]:
-        base_header = ["time", "solver_error", "iterations", "did_converge"]
+        base_header = ["solver_debug", "step"]
         headers = base_header + self.variable_names
 
         table_rows = []
         for step in self.steps:
             values = [
-                step.time,
-                step.error,
-                step.iterations,
-                step.did_converge,
+                f"{step.error:.0e};{step.iterations}{step.did_converge and "T" or "F"}",
+                step.time
             ]
             values.extend([f'{step.variable_values[i]:.{self.precision_digits}f}' for i in range(len(self.variable_names))])
 

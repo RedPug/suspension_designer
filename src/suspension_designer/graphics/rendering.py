@@ -28,6 +28,19 @@ from suspension_designer.editor.structures import NodeGroup, ReferencePlane
 from suspension_designer.graphics.selection import SelectionManager
 from suspension_designer.editor.scene import SceneState
 
+class CameraBasis:
+    FRONT = np.array([1,0,0])
+    RIGHT = np.array([0,1,0])
+    UP = np.array([0,0,1])
+
+    BACK = -FRONT
+    LEFT = -RIGHT
+    DOWN = -UP
+
+    ISOMETRIC = FRONT + RIGHT + UP
+    DIMETRIC = 0.333 * FRONT + 0.333 * RIGHT + 0.882 * UP
+    TRIMETRIC = 0.393 * FRONT + 0.518 * RIGHT + 0.761 * UP
+
 class Camera:
     def __init__(self, viewport: QWidget, *,
                  focus: np.ndarray,
@@ -261,7 +274,7 @@ class Viewport3D(QOpenGLWidget):
             viewport=self,
             focus = np.array([0.0, 0.0, 0.0]),
             distance = 5.0,
-            rotation = quaternion_from_direction(np.array([1.0,1.0,1.0])),
+            rotation = quaternion_from_direction(CameraBasis.ISOMETRIC, up=CameraBasis.UP),
             perspective = False,
             fov = 60.0,
             near_clip = 0.01,
@@ -379,21 +392,21 @@ class Viewport3D(QOpenGLWidget):
         # trimetric light
         glEnable(GL_LIGHT2)
         tri_brightness = 0.5
-        dir = self.camera.apply_rotation(np.array([[0.35, 0.93, 0.65]]))[0]
+        dir = self.camera.apply_rotation([CameraBasis.TRIMETRIC])[0]
         glLightfv(GL_LIGHT2, GL_POSITION, (*dir, 0.0))
         glLightfv(GL_LIGHT2, GL_DIFFUSE, (tri_brightness, tri_brightness, tri_brightness, 1.0))
 
         # back light
         glEnable(GL_LIGHT3)
         tri2_brightness = 0.3
-        dir = self.camera.apply_rotation(np.array([[0.0, 1.0, -1.0]]))[0]
+        dir = self.camera.apply_rotation([CameraBasis.BACK])[0]
         glLightfv(GL_LIGHT3, GL_POSITION, (*(dir), 0.0))
         glLightfv(GL_LIGHT3, GL_DIFFUSE, (tri2_brightness, tri2_brightness, tri2_brightness, 1.0))
 
-        # back light
+        # top(ish) light
         glEnable(GL_LIGHT4)
         tri3_brightness = 0.3
-        dir = self.camera.apply_rotation(np.array([[-0.35, 0.93, 0.65]]))[0]
+        dir = self.camera.apply_rotation(np.array([-0.35*CameraBasis.RIGHT + 0.93*CameraBasis.UP + 0.65*CameraBasis.FRONT]))[0]
         glLightfv(GL_LIGHT4, GL_POSITION, (*(dir), 0.0))
         glLightfv(GL_LIGHT4, GL_DIFFUSE, (tri3_brightness, tri3_brightness, tri3_brightness, 1.0))
 
