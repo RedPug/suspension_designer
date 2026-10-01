@@ -56,7 +56,7 @@ class TreeDock(QDockWidget):
         self.setWidget(self.tree)
 
     def _onSelectionChanged(self, selected, deselected):
-        print("selection changed")
+        # print("selection changed")
         indexes = selected.indexes()
 
         if not indexes:
