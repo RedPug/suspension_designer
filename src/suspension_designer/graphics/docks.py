@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from time import perf_counter
 from functools import partial
+from uuid import UUID
 
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, Signal
 
@@ -55,6 +56,7 @@ class TreeDock(QDockWidget):
         self.setWidget(self.tree)
 
     def _onSelectionChanged(self, selected, deselected):
+        print("selection changed")
         indexes = selected.indexes()
 
         if not indexes:
@@ -63,7 +65,9 @@ class TreeDock(QDockWidget):
 
         item = indexes[0].internalPointer()
 
-        self.document_manager.current_document.selection_manager.set_selected(item.data)
+        self.document_manager.current_document.selection_manager.set_selected(
+            self.document_manager.current_document.get_element_by_id(item.id)
+        )
 
     def setDocument(self, document: Document):
         """Switch to displaying a different document."""
@@ -85,8 +89,6 @@ class TreeDock(QDockWidget):
         )
 
         document.did_change.connect(self.refreshTree)
-
-
 
         self.tree.setModel(document.create_tree_model())
 
@@ -131,7 +133,7 @@ class TreeDock(QDockWidget):
             self.tree.setCurrentIndex(QModelIndex())
             return
 
-        index = self.findIndexForObject(selected)
+        index = self.findIndexForObject(selected.id)
 
         if index.isValid():
             self.tree.setCurrentIndex(index)
@@ -139,7 +141,8 @@ class TreeDock(QDockWidget):
             print(f"Tree Dock: Could not find index for selected object: {selected}, {index}")
 
 
-    def findIndexForObject(self, obj, parent=QModelIndex()):
+    def findIndexForObject(self, id: UUID, parent=QModelIndex()) -> QModelIndex:
+
         if self.tree.model() is None:
             return QModelIndex()
         
@@ -150,26 +153,15 @@ class TreeDock(QDockWidget):
 
             item = index.internalPointer()
 
-            if item.data is obj:
+            if item.id == id:
                 return index
 
-            child = self.findIndexForObject(obj, index)
+            # search for children of groups if the object is not found at this level
+            child = self.findIndexForObject(id, index)
             if child.isValid():
                 return child
 
         return QModelIndex()
-
-    def currentObject(self):
-        """Returns the selected object from the tree."""
-
-        index = self.tree.currentIndex()
-
-        if not index.isValid():
-            return None
-
-        item = index.internalPointer()
-
-        return item.data
 
 
 class PropertiesDock(QDockWidget):

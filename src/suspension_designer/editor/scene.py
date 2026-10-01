@@ -21,7 +21,7 @@ class SceneState(QObject):
         for node in self._nodes:
             node.did_change.connect(self.did_change.emit)
 
-        self.element_lookup = {}
+        self._element_lookup = None
     
         self._edges = edges
         self.is_editable = is_editable
@@ -61,25 +61,25 @@ class SceneState(QObject):
     def add_node(self, node: EditorNode):
         self._nodes.append(node)
         node.did_change.connect(self.did_change.emit)
-        self.element_lookup |= {node.id: node}
+        self._element_lookup |= {node.id: node}
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_reference_plane(self, plane: ReferencePlane):
         self.reference_planes.append(plane)
         plane.did_change.connect(self.did_change.emit)
-        self.element_lookup |= {plane.id: plane}
+        self._element_lookup |= {plane.id: plane}
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_group(self, group: NodeGroup):
         self._groups.append(group)
         group.did_change.connect(self.did_change.emit)
-        self.element_lookup |= {group.id: group}
+        self._element_lookup |= {group.id: group}
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_model_variable(self, variable: ModelVariableElement):
         self._model_variables.append(variable)
         variable.did_change.connect(self.did_change.emit)
-        self.element_lookup |= {variable.id: variable}
+        self._element_lookup |= {variable.id: variable}
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     @property
@@ -94,7 +94,7 @@ class SceneState(QObject):
             node.did_change.disconnect(self.did_change.emit)
 
         self._nodes = value
-        self.element_lookup = {}
+        self._element_lookup = None
         for node in self._nodes:
             node.did_change.connect(self.did_change.emit)
 
@@ -123,7 +123,7 @@ class SceneState(QObject):
             group.did_change.disconnect(self.did_change.emit)
 
         self._groups = value
-        self.element_lookup = {}
+        self._element_lookup = None
         for group in self._groups:
             group.did_change.connect(self.did_change.emit)
 
@@ -141,7 +141,7 @@ class SceneState(QObject):
             variable.did_change.disconnect(self.did_change.emit)
 
         self._model_variables = value
-        self.element_lookup = {}
+        self._element_lookup = None
         for variable in self._model_variables:
             variable.did_change.connect(self.did_change.emit)
 
@@ -162,14 +162,16 @@ class SceneState(QObject):
             element.did_change.disconnect(self.did_change.emit)
         else:
             raise ValueError("Element must be an EditorNode, ReferencePlane, or NodeGroup")
+
+        self._element_lookup.pop(element.id, None)
         
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def get_element_by_id(self, id: UUID, force_refresh: bool = False):
-        if self.element_lookup is None or force_refresh:
-            self.element_lookup = {node.id: node for node in self.nodes} | {plane.id: plane for plane in self.reference_planes} | {group.id: group for group in self.groups} | {variable.id: variable for variable in self._model_variables}
+        if self._element_lookup is None or force_refresh:
+            self._element_lookup = {node.id: node for node in self.nodes} | {plane.id: plane for plane in self.reference_planes} | {group.id: group for group in self.groups} | {variable.id: variable for variable in self._model_variables}
 
-        return self.element_lookup.get(id, None)
+        return self._element_lookup.get(id, None)
     
     def update_node_positions(self, node_positions: np.ndarray):
         for i, node in enumerate(self.nodes):
@@ -241,6 +243,8 @@ class SceneState(QObject):
         self.groups = other.groups
         self.model_variables = other.model_variables
         self.is_editable = other.is_editable
+
+        self._element_lookup = None
 
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 

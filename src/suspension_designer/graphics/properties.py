@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QHBoxLayout, QLabel, QL
 
 from typing import TYPE_CHECKING
 
-from suspension_designer.editor.commands import Command, CommandFactory, CommandManager, ModifyElementCommand
+from suspension_designer.editor.commands import Command, CommandFactory, CommandManager, NonLocalModifyElementCommand
 
 # Prevent circular imports during runtime type checking
 if TYPE_CHECKING:
@@ -24,12 +24,12 @@ class Property:
         self,
         name: str,
         *,
-        prop_type: PropertyType,
+        prop_editor: PropertyEditorFactory,
         get: Callable[['Document'], Any],
         set: CommandFactory = None,
     ):
         assert isinstance(name, str), "name must be a string"
-        assert isinstance(prop_type, PropertyType), "type must be an instance of PropertyType"
+        assert isinstance(prop_editor, PropertyEditorFactory), "prop_editor must be an instance of PropertyEditorFactory"
         assert isinstance(get, Callable), "get must be a callable"
         assert isinstance(set, (CommandFactory, type(None))), "set must be a CommandFactory or None"
 
@@ -38,7 +38,7 @@ class Property:
         self._getter = get
         self._command_factory = set
 
-        self.property_type = prop_type
+        self.prop_editor = prop_editor
 
         self.editor: QWidget = None
 
@@ -48,29 +48,29 @@ class Property:
 
     def create_editor(self, parent):
         if self.editor is None:
-            self.editor = self.property_type.create_editor(parent)
+            self.editor = self.prop_editor.create_editor(parent)
         return self.editor
 
     def refresh(self, document):
         """Refresh the editor widget with the current value from the document."""
         value = self._getter(document)
-        self.property_type.set_value(self, value, document)
+        self.prop_editor.set_value(self, value, document)
 
     def commit(self, document):
         """Commit the current value from the editor widget to the document."""
         if self._command_factory is None:
             return
 
-        value = self.property_type.get_value(self, document)
+        value = self.prop_editor.get_value(self, document)
         print("Committing property", self.name, "with value", value)
         command = self._command_factory.create(value=value)
         CommandManager.current.execute_command(command)
 
     def connect_changed(self, callback):
-        self.property_type.connect_changed(self, callback)
+        self.prop_editor.connect_changed(self, callback)
 
 
-class PropertyType(ABC):
+class PropertyEditorFactory(ABC):
 
     @abstractmethod
     def create_editor(self, parent):
@@ -89,7 +89,7 @@ class PropertyType(ABC):
         ...
 
 
-class DropdownPropertyType(PropertyType):
+class DropdownPropertyEditorFactory(PropertyEditorFactory):
     
     def __init__(self, options_callback: Callable[[Document], dict[str, Any]], default_index: int = 0, default_value: Any = None, tooltips: List[str] = None):
         self.options_callback = options_callback
@@ -142,7 +142,7 @@ class DropdownPropertyType(PropertyType):
         editor = prop.editor
         editor.currentIndexChanged.connect(lambda _: callback())
 
-class StringPropertyType(PropertyType):
+class StringPropertyEditorFactory(PropertyEditorFactory):
 
     def create_editor(self, parent):
         return QLineEdit(parent)
@@ -168,7 +168,7 @@ class StringPropertyType(PropertyType):
         editor.editingFinished.connect(callback)
 
 
-class NumberPropertyType(PropertyType):
+class NumberPropertyEditorFactory(PropertyEditorFactory):
 
     def __init__(self, *, decimals=2, step=1.0, suffix="", multiplier=1.0):
         self.decimals = decimals
@@ -320,7 +320,7 @@ class GroupEditor(QWidget):
 
         self.valueChanged.emit()
 
-class GroupPropertyType(PropertyType):
+class GroupPropertyEditorFactory(PropertyEditorFactory):
 
     def __init__(self, all_elements_callback: Callable[[Document], list['EditorNode']]):
         self.all_elements_callback = all_elements_callback

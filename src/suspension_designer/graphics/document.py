@@ -1,4 +1,4 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 import json
 import os
 import csv
@@ -32,7 +32,7 @@ from suspension_designer.editor.commands import CommandManager
 from suspension_designer.editor.keybinds import Keybinds
 from suspension_designer.editor.keybinds import Keybinds
 from suspension_designer.graphics.notifications import NotificationManager
-from suspension_designer.graphics.properties import Property, StringPropertyType
+from suspension_designer.graphics.properties import Property, StringPropertyEditorFactory
 from suspension_designer.graphics.rendering import Viewport3D
 from suspension_designer.solver.motion import MotionData, MotionTableWidget
 from suspension_designer.solver.result_viewer import ResultViewer
@@ -59,10 +59,11 @@ class Document(Selectable):
         self.widget = None
         self.document_manager = None
 
-        self.selection_manager = SelectionManager()
+        self.selection_manager = SelectionManager(self)
         self.dock_layout_state: str | None = None
 
         self.command_manager = CommandManager(self)
+        self.command_manager.did_undo.connect(self.selection_manager.refresh_selection)
 
     def create_tree_model(self) -> QAbstractItemModel:
         return None
@@ -95,19 +96,22 @@ class Document(Selectable):
             "Info":[
                 Property("ID",
                     get=lambda _: self.id,
-                    prop_type=StringPropertyType()
+                    prop_editor=StringPropertyEditorFactory()
                 ),
                 Property("Name",
                     get=lambda _: self.name,
                     set=lambda name, _: setattr(self, 'name', name),
-                    prop_type=StringPropertyType()
+                    prop_editor=StringPropertyEditorFactory()
                 ),
                 Property("Filepath",
                     get=lambda _: self.filepath,
-                    prop_type=StringPropertyType()
+                    prop_editor=StringPropertyEditorFactory()
                 ),
             ]
         }
+
+    def get_element_by_id(self, id: UUID):
+        raise NotImplementedError("Subclasses must implement the get_element_by_id method.")
     
     def _save_proj(self, filepath: str, data: dict, type: str) -> tuple[bool, str | None]:
         data = {
@@ -192,6 +196,9 @@ class EditorDocument(Document):
         self.viewport = viewport
         self.widget = self.viewport
         return self.widget
+
+    def get_element_by_id(self, id: UUID):
+        return self.scene_state.get_element_by_id(id)
     
     def save(self, prompt_user: bool = False) -> tuple[bool, str | None]:
         # Implement saving logic for the scene document

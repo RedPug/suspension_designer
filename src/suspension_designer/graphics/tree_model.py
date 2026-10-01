@@ -1,16 +1,20 @@
+from uuid import UUID
+
 from PySide6.QtCore import (QAbstractItemModel, QModelIndex, Qt)
 
 from suspension_designer.editor.scene import SceneState
 
 
 class TreeItem:
-    def __init__(self, name: str, *, data=None, parent=None, can_rename: bool = ..., can_select: bool = True):
+    def __init__(self, name: str, *, parent=None, can_rename: bool = ..., can_select: bool = True, id=...):
+        assert isinstance(id, UUID) and can_select or not can_select, "ID must be a UUID instance if the item is selectable"
+
         self.name = name
-        self.data = data
         self.parent = parent
         self.children = []
         self.can_rename = can_rename
         self.can_select = can_select
+        self.id = id
 
     def add_child(self, child: 'TreeItem'):
         child.parent = self
@@ -40,7 +44,7 @@ class SceneTreeModel(QAbstractItemModel):
 
         scene: SceneState = self.document.scene_state
 
-        self.root.add_child(TreeItem("Scene", data=self.document))
+        # self.root.add_child(TreeItem("Scene", data=self.document))
 
         nodes = TreeItem("Nodes", can_select=False)
         groups = TreeItem("Groups", can_select=False)
@@ -53,16 +57,16 @@ class SceneTreeModel(QAbstractItemModel):
         self.root.add_child(model_variables)
 
         for node in scene.nodes:
-            nodes.add_child(TreeItem(node.name, data=node))
+            nodes.add_child(TreeItem(node.name, id=node.id))
 
         for group in scene.groups:
-            groups.add_child(TreeItem(group.name, data=group))
+            groups.add_child(TreeItem(group.name, id=group.id))
 
         for plane in scene.reference_planes:
-            planes.add_child(TreeItem(plane.name, data=plane))
+            planes.add_child(TreeItem(plane.name, id=plane.id))
 
         for element in scene.model_variables:
-            model_variables.add_child(TreeItem(element.name, data=element))
+            model_variables.add_child(TreeItem(element.name, id=element.id))
 
     # ---------- Required Qt methods ----------
 

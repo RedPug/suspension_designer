@@ -31,13 +31,20 @@ class Selectable(QObject):
 class SelectionManager(QObject):
     selection_changed = Signal()  # Signal to emit when selection changes
 
-    def __init__(self):
+    def __init__(self, document):
         super().__init__()
 
+        self._document = document
         self._selected_object: Selectable = None
         self._subselections: list[Selectable] = []
 
-        # self.selection_changed.connect(lambda: print(f"Selection changed to: {self._selected_object}"))
+    def refresh_selection(self):
+        """Gets the current selected item from the current document, using the same id to find the same item.
+        """
+        if self._selected_object is not None:
+            self.set_selected(
+                self._document.get_element_by_id(self._selected_object.id)
+            )
 
     def on_selection_modified(self):
         self._update_subselections()
@@ -53,7 +60,10 @@ class SelectionManager(QObject):
                 self._subselections = []
 
     def set_selected(self, item: Selectable):
-        if self._selected_object == item:
+        assert item is None or isinstance(item, Selectable), f"Item ({item}) must be None or an instance of Selectable"
+
+        # checks for the same object, not just the same values in a different instance
+        if self._selected_object is item:
             return  # No change in selection
         
         if self._selected_object is not None:
@@ -63,8 +73,6 @@ class SelectionManager(QObject):
 
         if self._selected_object is not None:
             self._selected_object.did_change.connect(self.on_selection_modified)
-
-        # self._update_subselections()
 
         self.on_selection_modified()
 
