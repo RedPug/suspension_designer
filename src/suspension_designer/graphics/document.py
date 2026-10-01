@@ -28,6 +28,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QClipboard, QKeySequence
 
 
+from suspension_designer.editor.commands import CommandManager
+from suspension_designer.editor.keybinds import Keybinds
+from suspension_designer.editor.keybinds import Keybinds
+from suspension_designer.graphics.notifications import NotificationManager
 from suspension_designer.graphics.properties import Property, StringPropertyType
 from suspension_designer.graphics.rendering import Viewport3D
 from suspension_designer.solver.motion import MotionData, MotionTableWidget
@@ -37,7 +41,6 @@ from suspension_designer.editor.scene import SceneState
 from suspension_designer.graphics.tree_model import SceneTreeModel
 from suspension_designer.solver.results_compiler import ResultsCompilation, ResultsCompiler
 from suspension_designer.data_manager import save_csv, save_json, get_filepath
-
 
 
 DOCK_TREE = "tree"
@@ -58,6 +61,8 @@ class Document(Selectable):
 
         self.selection_manager = SelectionManager()
         self.dock_layout_state: str | None = None
+
+        self.command_manager = CommandManager(self)
 
     def create_tree_model(self) -> QAbstractItemModel:
         return None
@@ -90,16 +95,16 @@ class Document(Selectable):
             "Info":[
                 Property("ID",
                     get=lambda _: self.id,
-                    type=StringPropertyType()
+                    prop_type=StringPropertyType()
                 ),
                 Property("Name",
                     get=lambda _: self.name,
                     set=lambda name, _: setattr(self, 'name', name),
-                    type=StringPropertyType()
+                    prop_type=StringPropertyType()
                 ),
                 Property("Filepath",
                     get=lambda _: self.filepath,
-                    type=StringPropertyType()
+                    prop_type=StringPropertyType()
                 ),
             ]
         }
@@ -368,6 +373,10 @@ class DocumentManager(QObject):
     def __init__(self):
         super().__init__()
 
+        Keybinds.SAVE.key_pressed.connect(self.save_current)
+        Keybinds.SAVE_ALL.key_pressed.connect(self.save_all)
+        Keybinds.CLOSE_DOCUMENT.key_pressed.connect(self.remove_current_document)
+
         self._documents: list[Document] = []
         
         self.selected_doc_index = None
@@ -401,6 +410,8 @@ class DocumentManager(QObject):
         elif doc in self._documents:
             self.selected_doc_index = self._documents.index(doc)
 
+            doc.command_manager.set_active()
+
             if isinstance(doc, MotionDocument):
                 source_document = self.get_document_by_filepath(doc.editor_filepath)
                 if isinstance(source_document, EditorDocument):
@@ -414,15 +425,18 @@ class DocumentManager(QObject):
         for doc in self._documents:
             _, path = doc.save()
             print(f"Saved {doc.name} to {path}")
+        NotificationManager.status_bar.showMessage(f"Saved All Documents", 5000)
 
     def save_current(self):
         if self.selected_doc_index is None:
             print("No document is currently selected.")
+            NotificationManager.status_bar.showMessage("Failed to save: No document is currently selected.", 5000)
             return
         
         current_doc = self._documents[self.selected_doc_index]
         _, path = current_doc.save()
         print(f"Saved {current_doc.name} to {path}")
+        NotificationManager.status_bar.showMessage(f"Saved Current Document", 5000)
 
     def save_current_as(self):
         if self.selected_doc_index is None:
@@ -432,6 +446,7 @@ class DocumentManager(QObject):
         current_doc = self._documents[self.selected_doc_index]
         _, path = current_doc.save(prompt_user=True)
         print(f"Saved {current_doc.name} to {path}")
+        NotificationManager.status_bar.showMessage(f"Saved Current Document to {path}", 5000)
 
     def load(self):
         filepath, _ = QFileDialog.getOpenFileName(
@@ -490,6 +505,13 @@ class DocumentManager(QObject):
             document.widget = None  # Clear the reference to the widget
 
         document.deleteLater()
+
+    def remove_current_document(self):
+        if self.selected_doc_index is not None:
+            current_doc = self._documents[self.selected_doc_index]
+            self.remove_document(current_doc)
+        else:
+            print("No document is currently selected to remove.")
 
     def create_new_editor_document(self, name: str = "New Document"):
         new_doc = EditorDocument(name=name)

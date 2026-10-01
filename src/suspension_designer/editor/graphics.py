@@ -19,7 +19,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtCore import QByteArray
 
-from suspension_designer.editor.structures import EditorNode, NodeGroup, ReferencePlane
+from suspension_designer.editor.keybinds import Keybinds
+from suspension_designer.editor.elements import EditorNode, NodeGroup, ReferencePlane
+from suspension_designer.graphics.notifications import NotificationManager
 from suspension_designer.solver.model_variables import ModelVariableElement
 from suspension_designer.graphics.document import Document, DocumentManager
 from suspension_designer.graphics.rendering import Camera, CameraBasis, Viewport3D
@@ -293,24 +295,6 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(container)
 
-        # self.setDockOptions(
-        #     QMainWindow.DockOption.AnimatedDocks | 
-        #     QMainWindow.DockOption.AllowNestedDocks | 
-        #     QMainWindow.DockOption.AllowTabbedDocks
-        # )
-
-        # all_docks = [
-        #     (PropertiesDock(self, self.scene_manager), Qt.RightDockWidgetArea),
-        #     (SceneTreeDock(self, self.scene_manager), Qt.LeftDockWidgetArea)
-        # ]
-
-        # for dock_widget, location in all_docks:
-        #     if location is not None:
-        #         self.addDockWidget(location, dock_widget)
-        #     else:
-        #         self.addDockWidget(Qt.LeftDockWidgetArea, dock_widget)
-        #         dock_widget.hide()  # start hidden
-
         self.tree_dock = TreeDock(self, document_manager=self.document_manager)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.tree_dock)
 
@@ -320,9 +304,6 @@ class MainWindow(QMainWindow):
         self.tree_dock.hide()
         self.property_dock.hide()
 
-        # self.toolbar = ToolBar(self)
-        # self.addToolBar(self.toolbar)
-
         self.menu_bar = MenuBar(self,
             docks=[self.tree_dock, self.property_dock],
             document_manager=self.document_manager
@@ -331,23 +312,28 @@ class MainWindow(QMainWindow):
 
         self.status_bar = StatusBar(self)
         self.setStatusBar(self.status_bar)
+        NotificationManager.bind_status_bar(self.status_bar)
 
     def keyPressEvent(self, event):
-        key = event.key()
-        ctrl = event.modifiers() & Qt.ControlModifier
-        shift = event.modifiers() & Qt.ShiftModifier
-        # print(f"Key pressed: {event.key()}, modifiers: {event.modifiers()}")
-        if key == Qt.Key.Key_S and ctrl:
-            if shift:
-                print("Ctrl+Shift+S pressed: Save all scenes")
-                self.document_manager.save_all()
-            else:
-                print("Ctrl+S pressed: Save scene")
-                self.document_manager.save_current()
-        elif key == Qt.Key.Key_W and ctrl:
-            self.document_manager.remove_document(self.document_manager.current_document)
-        else:
-            super().keyPressEvent(event)
+        for keybind in Keybinds.all():
+            if keybind.handle_event(event):
+                return
+        super().keyPressEvent(event)
+        # key = event.key()
+        # ctrl = event.modifiers() & Qt.ControlModifier
+        # shift = event.modifiers() & Qt.ShiftModifier
+        # # print(f"Key pressed: {event.key()}, modifiers: {event.modifiers()}")
+        # if key == Qt.Key.Key_S and ctrl:
+        #     if shift:
+        #         print("Ctrl+Shift+S pressed: Save all scenes")
+        #         self.document_manager.save_all()
+        #     else:
+        #         print("Ctrl+S pressed: Save scene")
+        #         self.document_manager.save_current()
+        # elif key == Qt.Key.Key_W and ctrl:
+        #     self.document_manager.remove_document(self.document_manager.current_document)
+        # else:
+        #     super().keyPressEvent(event)
 
 
     def closeEvent(self, event):

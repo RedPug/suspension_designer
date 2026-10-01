@@ -24,7 +24,7 @@ QSurfaceFormat.setDefaultFormat(fmt)
 
 
 from suspension_designer.math import get_rotation_matrix_from_quaternion, quaternion_from_direction, mult_quaternions
-from suspension_designer.editor.structures import NodeGroup, ReferencePlane
+from suspension_designer.editor.elements import NodeGroup, ReferencePlane
 from suspension_designer.graphics.selection import SelectionManager
 from suspension_designer.editor.scene import SceneState
 

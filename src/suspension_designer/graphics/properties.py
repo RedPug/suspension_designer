@@ -12,9 +12,62 @@ from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QHBoxLayout, QLabel, QL
 
 from typing import TYPE_CHECKING
 
+from suspension_designer.editor.commands import Command, CommandFactory, CommandManager, ModifyElementCommand
+
 # Prevent circular imports during runtime type checking
 if TYPE_CHECKING:
-    from suspension_designer.editor.structures import SceneState, EditorNode
+    from suspension_designer.editor.elements import EditorNode
+    from suspension_designer.graphics.document import Document
+
+class Property:
+    def __init__(
+        self,
+        name: str,
+        *,
+        prop_type: PropertyType,
+        get: Callable[['Document'], Any],
+        set: CommandFactory = None,
+    ):
+        assert isinstance(name, str), "name must be a string"
+        assert isinstance(prop_type, PropertyType), "type must be an instance of PropertyType"
+        assert isinstance(get, Callable), "get must be a callable"
+        assert isinstance(set, (CommandFactory, type(None))), "set must be a CommandFactory or None"
+
+        self.name = name
+
+        self._getter = get
+        self._command_factory = set
+
+        self.property_type = prop_type
+
+        self.editor: QWidget = None
+
+    @property
+    def editable(self):
+        return self._command_factory is not None
+
+    def create_editor(self, parent):
+        if self.editor is None:
+            self.editor = self.property_type.create_editor(parent)
+        return self.editor
+
+    def refresh(self, document):
+        """Refresh the editor widget with the current value from the document."""
+        value = self._getter(document)
+        self.property_type.set_value(self, value, document)
+
+    def commit(self, document):
+        """Commit the current value from the editor widget to the document."""
+        if self._command_factory is None:
+            return
+
+        value = self.property_type.get_value(self, document)
+        print("Committing property", self.name, "with value", value)
+        command = self._command_factory.create(value=value)
+        CommandManager.current.execute_command(command)
+
+    def connect_changed(self, callback):
+        self.property_type.connect_changed(self, callback)
 
 
 class PropertyType(ABC):
@@ -38,7 +91,7 @@ class PropertyType(ABC):
 
 class DropdownPropertyType(PropertyType):
     
-    def __init__(self, options_callback: Callable[['SceneState'], dict[str, Any]], default_index: int = 0, default_value: Any = None, tooltips: List[str] = None):
+    def __init__(self, options_callback: Callable[[Document], dict[str, Any]], default_index: int = 0, default_value: Any = None, tooltips: List[str] = None):
         self.options_callback = options_callback
         self.default_index = default_index
         self.default_value = default_value
@@ -47,14 +100,14 @@ class DropdownPropertyType(PropertyType):
     def create_editor(self, parent):
         return QComboBox(parent)
 
-    def set_value(self, prop, value, scene_state: 'SceneState'):
+    def set_value(self, prop, value, document: Document):
         editor = prop.editor
         if editor is None:
             return
 
         editor.blockSignals(True)
         
-        options = self.options_callback(scene_state)
+        options = self.options_callback(document)
         keys = list(options.keys())
 
         # rebuild item options for the combo box
@@ -77,12 +130,12 @@ class DropdownPropertyType(PropertyType):
                 editor.setCurrentIndex(self.default_index)  # No selection
         editor.blockSignals(False)
 
-    def get_value(self, prop, scene_state: 'SceneState'):
+    def get_value(self, prop, document: Document):
         editor = prop.editor
         if editor is None:
             return None
 
-        v = self.options_callback(scene_state).get(editor.currentText(), None)
+        v = self.options_callback(document).get(editor.currentText(), None)
         return v
 
     def connect_changed(self, prop, callback):
@@ -94,7 +147,7 @@ class StringPropertyType(PropertyType):
     def create_editor(self, parent):
         return QLineEdit(parent)
 
-    def set_value(self, prop, value, scene_state: 'SceneState'):
+    def set_value(self, prop, value, document: Document):
         editor = prop.editor
         if editor is None:
             return
@@ -103,7 +156,7 @@ class StringPropertyType(PropertyType):
         editor.setText("" if value is None else str(value))
         editor.blockSignals(False)
 
-    def get_value(self, prop, scene_state: 'SceneState'):
+    def get_value(self, prop, document: Document):
         editor = prop.editor
         if editor is None:
             return ""
@@ -133,7 +186,7 @@ class NumberPropertyType(PropertyType):
         editor.setSuffix(self.suffix)
         return editor
 
-    def set_value(self, prop, value, scene_state: 'SceneState'):
+    def set_value(self, prop, value, document: Document):
         editor = prop.editor
         if editor is None:
             return
@@ -150,7 +203,7 @@ class NumberPropertyType(PropertyType):
 
         editor.blockSignals(False)
 
-    def get_value(self, prop, scene_state: 'SceneState'):
+    def get_value(self, prop, document: Document):
         editor = prop.editor
         if editor is None:
             return 0
@@ -163,50 +216,7 @@ class NumberPropertyType(PropertyType):
         def handler(*args):
             callback()
 
-        editor.lineEdit().editingFinished.connect(handler)
-        
-class Property:
-    def __init__(
-        self,
-        name,
-        *,
-        type,
-        get,
-        set = None,
-        
-    ):
-        # self.id = id
-        self.name = name
-
-        self._getter = get
-        self._setter = set
-
-        self.property_type = type
-
-        self.editor = None
-
-    @property
-    def editable(self):
-        return self._setter is not None
-
-    def create_editor(self, parent):
-        if self.editor is None:
-            self.editor = self.property_type.create_editor(parent)
-        return self.editor
-
-    def refresh(self, scene_state):
-        value = self._getter(scene_state)
-        self.property_type.set_value(self, value, scene_state)
-
-    def commit(self, scene_state):
-        if self._setter is None:
-            return
-
-        value = self.property_type.get_value(self, scene_state)
-        self._setter(value, scene_state)
-
-    def connect_changed(self, callback):
-        self.property_type.connect_changed(self, callback)
+        editor.editingFinished.connect(handler)
 
 class GroupEditor(QWidget):
     valueChanged = Signal()
@@ -312,19 +322,19 @@ class GroupEditor(QWidget):
 
 class GroupPropertyType(PropertyType):
 
-    def __init__(self, all_nodes_callback: Callable[['SceneState'], list['EditorNode']]):
-        self.all_nodes_callback = all_nodes_callback
+    def __init__(self, all_elements_callback: Callable[[Document], list['EditorNode']]):
+        self.all_elements_callback = all_elements_callback
 
     def create_editor(self, parent):
         return GroupEditor(parent)
 
-    def set_value(self, prop, value, scene_state: 'SceneState'):
+    def set_value(self, prop, value, document: Document):
         prop.editor.set_nodes(
-            self.all_nodes_callback(scene_state),
+            self.all_elements_callback(document),
             value,
         )
 
-    def get_value(self, prop, scene_state: 'SceneState'):
+    def get_value(self, prop, document: Document):
         return prop.editor.selected_nodes()
 
     def connect_changed(self, prop, callback):

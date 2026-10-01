@@ -8,6 +8,7 @@ from PySide6.QtCore import (QObject, Signal)
 import numpy as np
 
 # from src.solver import SolverState, solve_system, SolverResult
+from suspension_designer.editor.commands import CommandFactory, ModifyElementCommand
 from suspension_designer.graphics.properties import DropdownPropertyType, GroupPropertyType, NumberPropertyType, Property, StringPropertyType
 # from src.scene import SceneState
 from suspension_designer.graphics.selection import Selectable
@@ -35,14 +36,27 @@ class EditorNode(Selectable):
 
         self._world_position = value
         self.did_change.emit()
-    
-    def set_x(self, x):
+
+    @property
+    def x(self):
+        return self.world_position[0]
+
+    @x.setter
+    def x(self, x):
         self.set_world_position(np.array([x, self.world_position[1], self.world_position[2]]), ignore_direction=np.array([1, 0, 0]))
-
-    def set_y(self, y):
+    @property
+    def y(self):
+        return self.world_position[1]
+    
+    @y.setter
+    def y(self, y):
         self.set_world_position(np.array([self.world_position[0], y, self.world_position[2]]), ignore_direction=np.array([0, 1, 0]))
-
-    def set_z(self, z):
+    @property
+    def z(self):
+        return self.world_position[2]
+    
+    @z.setter
+    def z(self, z):
         self.set_world_position(np.array([self.world_position[0], self.world_position[1], z]), ignore_direction=np.array([0, 0, 1]))
 
     @property
@@ -83,17 +97,17 @@ class EditorNode(Selectable):
             "Info":[
                 Property("ID",
                     get=lambda _: self.id,
-                    type=StringPropertyType()
+                    prop_type=StringPropertyType()
                 ),
                 Property("Name",
                     get=lambda _: self.name,
-                    set=lambda name, _: setattr(self, 'name', name),
-                    type=StringPropertyType()
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='name'),
+                    prop_type=StringPropertyType()
                 ),
                 Property("Constrainted to",
                     get=lambda _: self.locked_plane,
-                    set=lambda plane, _: setattr(self, 'locked_plane', plane),
-                    type=DropdownPropertyType(
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='locked_plane'),
+                    prop_type=DropdownPropertyType(
                         options_callback = lambda scene: {"No Selection": None} | {plane.name: plane for plane in scene.reference_planes}
                     )
                 ),
@@ -101,18 +115,18 @@ class EditorNode(Selectable):
             "Transform":[
                 Property("X",
                     get=lambda _: self.world_position[0],
-                    set=lambda x, _: self.set_x(x),
-                    type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='x'),
+                    prop_type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
                 ),
                 Property("Y",
                     get=lambda _: self.world_position[1],
-                    set=lambda y, _: self.set_y(y),
-                    type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2,  suffix=" mm")
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='y'),
+                    prop_type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2,  suffix=" mm")
                 ),
                 Property("Z",
                     get=lambda _: self.world_position[2],
-                    set=lambda z, _: self.set_z(z),
-                    type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='z'),
+                    prop_type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
                 )
             ]
         }
@@ -292,21 +306,21 @@ class ReferencePlane(Selectable):
     def get_property_list(self) -> dict[str, list[Property]]:
         return {
             "Info":[
-                Property("ID", get=lambda _: self.id, type=StringPropertyType()),
-                Property("Name", get=lambda _: self.name, set=lambda name, _: setattr(self, 'name', name), type=StringPropertyType()),
-                Property("Center X", get=lambda _: self.point[0] if self.point is not None else None, type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Center Y", get=lambda _: self.point[1] if self.point is not None else None, type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Center Z", get=lambda _: self.point[2] if self.point is not None else None, type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
-                Property("Normal X", get=lambda _: self.normal[0] if self.normal is not None else None, type=NumberPropertyType(multiplier=1, decimals=2)),
-                Property("Normal Y", get=lambda _: self.normal[1] if self.normal is not None else None, type=NumberPropertyType(multiplier=1, decimals=2)),
-                Property("Normal Z", get=lambda _: self.normal[2] if self.normal is not None else None, type=NumberPropertyType(multiplier=1, decimals=2)),
+                Property("ID", get=lambda _: self.id, prop_type=StringPropertyType()),
+                Property("Name", get=lambda _: self.name, set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='name'), prop_type=StringPropertyType()),
+                Property("Center X", get=lambda _: self.point[0] if self.point is not None else None, prop_type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
+                Property("Center Y", get=lambda _: self.point[1] if self.point is not None else None, prop_type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
+                Property("Center Z", get=lambda _: self.point[2] if self.point is not None else None, prop_type=NumberPropertyType(multiplier=1e-3, decimals=2, suffix=" mm")),
+                Property("Normal X", get=lambda _: self.normal[0] if self.normal is not None else None, prop_type=NumberPropertyType(multiplier=1, decimals=2)),
+                Property("Normal Y", get=lambda _: self.normal[1] if self.normal is not None else None, prop_type=NumberPropertyType(multiplier=1, decimals=2)),
+                Property("Normal Z", get=lambda _: self.normal[2] if self.normal is not None else None, prop_type=NumberPropertyType(multiplier=1, decimals=2)),
             ],
             "Transform":[
-                Property("Mode", get=lambda _: self.mode, set=lambda mode, _: setattr(self, 'mode', mode), type=DropdownPropertyType(options_callback=lambda _: {"Containing":ReferencePlane.Mode.CONTAINING, "Perpendicular":ReferencePlane.Mode.PERPENDICULAR}, tooltips=["Plane contains all 3 points", "Plane is perpendicular to P0 -> P1, and contains P2"])),
+                Property("Mode", get=lambda _: self.mode, set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='mode'), prop_type=DropdownPropertyType(options_callback=lambda _: {"Containing":ReferencePlane.Mode.CONTAINING, "Perpendicular":ReferencePlane.Mode.PERPENDICULAR}, tooltips=["Plane contains all 3 points", "Plane is perpendicular to P0 -> P1, and contains P2"])),
 
-                Property("Point 0", get=lambda _: self.p0, set=lambda p, _: setattr(self, 'p0', p), type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p1 and node != self.p2})),
-                Property("Point 1", get=lambda _: self.p1, set=lambda p, _: setattr(self, 'p1', p), type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p0 and node != self.p2})),
-                Property("Point 2", get=lambda _: self.p2, set=lambda p, _: setattr(self, 'p2', p), type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p0 and node != self.p1})),
+                Property("Point 0", get=lambda _: self.p0, set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='p0'), prop_type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p1 and node != self.p2})),
+                Property("Point 1", get=lambda _: self.p1, set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='p1'), prop_type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p0 and node != self.p2})),
+                Property("Point 2", get=lambda _: self.p2, set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='p2'), prop_type=DropdownPropertyType(options_callback=lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.p0 and node != self.p1})),
             ]
         }
     
@@ -392,17 +406,17 @@ class NodeGroup(Selectable):
             "Info": [
                 Property("ID",
                     get=lambda _: self.id,
-                    type=StringPropertyType()
+                    prop_type=StringPropertyType()
                 ),
                 Property("Name",
                     get=lambda _: self.name,
-                    set=lambda name, _: setattr(self, 'name', name),
-                    type=StringPropertyType()
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='name'),
+                    prop_type=StringPropertyType()
                 ),
                 Property("Contains",
                     get = lambda _: self.nodes,
-                    set = lambda v, _: setattr(self, 'nodes', v),
-                    type = GroupPropertyType(all_nodes_callback = lambda scene: scene.nodes)
+                    set = CommandFactory(ModifyElementCommand, element_id=self.id, property_name='nodes'),
+                    prop_type = GroupPropertyType(all_nodes_callback = lambda scene: scene.nodes)
                 ),
             ]
         }

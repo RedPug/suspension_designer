@@ -1,22 +1,19 @@
 from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor, wait
-import multiprocessing
-from dataclasses import dataclass, field
-from math import ceil, floor
-import os
-import pickle
+from dataclasses import dataclass
+from math import ceil
 import threading
 import threading
-from time import perf_counter, time, sleep
+from time import perf_counter
 from typing import Any, Callable, Sequence
 from uuid import UUID
 
 import numpy as np
 
-from PySide6.QtCore import QObject, QTimer, Signal, Signal
+from PySide6.QtCore import QObject, Signal
 
-from suspension_designer.solver.model_variables import DisplacementVariable, DistanceVariable
+from suspension_designer.graphics.notifications import NotificationManager
 from suspension_designer.solver.motion import MotionData, MotionVariableData
 from suspension_designer.editor.scene import SceneState
 from suspension_designer.solver.solver import solve_at_time, SolverResult
@@ -126,7 +123,7 @@ class StepCompilationData:
     scene_state_dict: dict
     solver_kwargs: dict
 
-def _compile_step_task(data: StepCompilationData):
+def _compile_step_task(data: StepCompilationData, bridge: ThreadBridge):
     t_start = perf_counter()
     scene_state = SceneState.from_dict(data.scene_state_dict)
 
@@ -162,6 +159,8 @@ def _compile_step_task(data: StepCompilationData):
 
         steps.append(step)
 
+        bridge.progress_update.emit(len(steps), len(data.times))
+
         t1 = perf_counter()
         cum_eval_time += t1 - t0
 
@@ -173,6 +172,7 @@ def _compile_step_task(data: StepCompilationData):
 class ThreadBridge(QObject):
     # This signal carries the final object back to the main thread
     compilation_ready = Signal(ResultsCompilation)
+    progress_update = Signal(int,int)  # current_step, total_steps
 
 class ResultsCompiler:
     """Simulates a motion profile and compiles model-variable values into a table."""
@@ -203,7 +203,7 @@ class ResultsCompiler:
 
         return np.round(np.arange(self.start_time, self.end_time + self.step * 0.5, self.step), 10)
 
-    def _compile(self) -> ResultsCompilation:
+    def _compile(self, thread_bridge: ThreadBridge) -> ResultsCompilation:
         """Run the solver at each time step and collect values for all model variables."""
 
         motion_profile = MotionData.from_dict(self.motion_profile.to_dict())
@@ -214,13 +214,7 @@ class ResultsCompiler:
 
         steps: list[ResultsCompilationStep] = []
 
-        total_steps = len(times)
-        current_step = 0
-
         precision_digits = 16
-
-        progress_index = 0
-        PROGRESS_TEXT = "1....2....3....4....5....6....7....8....9....!"
 
         # print("Solving: ", end="", flush=True)
         print("Solving...")
@@ -249,9 +243,9 @@ class ResultsCompiler:
             for i in range(0, len(times), chunk_size)
         ]
 
-        print("time ranges:")
-        for data in step_data:
-            print(f"  {data.times[0]} to {data.times[-1]}")
+        # print("time ranges:")
+        # for data in step_data:
+        #     print(f"  {data.times[0]} to {data.times[-1]}")
 
         if SYNCHRONOUS:
             data = StepCompilationData(
@@ -261,7 +255,7 @@ class ResultsCompiler:
                 scene_state_dict=scene_state_dict,
                 solver_kwargs=self.solver_kwargs
             )
-            some_steps, precision, output_times = _compile_step_task(data)
+            some_steps, precision, output_times = _compile_step_task(data, thread_bridge)
             print("Solver time: {:.3f} seconds, eval time: {:.3f} seconds, total time: {:.3f} seconds".format(output_times[0], output_times[1], output_times[2]))
             steps.extend(some_steps)
             precision_digits = min(precision_digits, precision)
@@ -269,7 +263,7 @@ class ResultsCompiler:
             with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
                 t01 = perf_counter()
                 futures = [
-                    executor.submit(_compile_step_task, data)
+                    executor.submit(_compile_step_task, data, thread_bridge)
                     for data in step_data
                 ]
 
@@ -307,8 +301,11 @@ class ResultsCompiler:
         bridge = ThreadBridge()
         bridge.compilation_ready.connect(completed)
 
+        bridge.compilation_ready.connect(lambda result: NotificationManager.status_bar.showMessage(f"Solver Completed!", 3000))
+        bridge.progress_update.connect(lambda current, total: NotificationManager.status_bar.showMessage(f"Solving {current}/{total} ({current/total*100:.0f}%)"))
+
         def func():
-            variable_names, steps, precision_digits = self._compile()
+            variable_names, steps, precision_digits = self._compile(bridge)
             result = ResultsCompilation(
                 base_scene=self.scene_state,
                 variable_names=variable_names,

@@ -8,7 +8,7 @@ from PySide6.QtCore import (QObject, Signal)
 import numpy as np
 
 from suspension_designer.solver.model_variables import ModelVariableElement
-from suspension_designer.editor.structures import EditorNode, NodeGroup, ReferencePlane
+from suspension_designer.editor.elements import EditorNode, NodeGroup, ReferencePlane
 
 
 class SceneState(QObject):
@@ -45,7 +45,18 @@ class SceneState(QObject):
         self.name = name
 
         self.id = uuid4()  # Unique identifier for the scene
-        
+
+    def add_element(self, element):
+        if isinstance(element, EditorNode):
+            self.add_node(element)
+        elif isinstance(element, ReferencePlane):
+            self.add_reference_plane(element)
+        elif isinstance(element, NodeGroup):
+            self.add_group(element)
+        elif isinstance(element, ModelVariableElement):
+            self.add_model_variable(element)
+        else:
+            raise ValueError("Element must be an EditorNode, ReferencePlane, NodeGroup, or ModelVariableElement")
 
     def add_node(self, node: EditorNode):
         self._nodes.append(node)
@@ -121,6 +132,20 @@ class SceneState(QObject):
     @property
     def model_variables(self) -> list[ModelVariableElement]:
         return self._model_variables
+
+    @model_variables.setter
+    def model_variables(self, value):
+        assert isinstance(value, list) and all(isinstance(variable, ModelVariableElement) for variable in value), "Model variables must be a list of ModelVariableElements"
+        
+        for variable in self._model_variables:
+            variable.did_change.disconnect(self.did_change.emit)
+
+        self._model_variables = value
+        self.element_lookup = {}
+        for variable in self._model_variables:
+            variable.did_change.connect(self.did_change.emit)
+
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def delete_element(self, element):
         if type(element) == EditorNode:
@@ -209,7 +234,7 @@ class SceneState(QObject):
             name=name
         )
     
-    def set(self, other: 'SceneState'):
+    def restore(self, other: 'SceneState'):
         self.nodes = other.nodes
         self.edges = other.edges
         self.reference_planes = other.reference_planes

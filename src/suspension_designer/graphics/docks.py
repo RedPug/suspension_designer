@@ -136,7 +136,7 @@ class TreeDock(QDockWidget):
         if index.isValid():
             self.tree.setCurrentIndex(index)
         else:
-            print(f"Could not find index for selected object: {selected}, {index}")
+            print(f"Tree Dock: Could not find index for selected object: {selected}, {index}")
 
 
     def findIndexForObject(self, obj, parent=QModelIndex()):

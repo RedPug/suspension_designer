@@ -4,8 +4,9 @@ from uuid import UUID, uuid4
 from PySide6.QtCore import (QObject, Signal)
 import numpy as np
 
+from suspension_designer.editor.commands import CommandFactory, ModifyElementCommand
 from suspension_designer.graphics.properties import DropdownPropertyType, NumberPropertyType, Property, StringPropertyType
-from suspension_designer.editor.structures import EditorNode
+from suspension_designer.editor.elements import EditorNode
 
 class ModelVariableElement(QObject):
     did_change = Signal()
@@ -54,8 +55,13 @@ class ModelVariableElement(QObject):
         if hasattr(self._variable, 'get_subselections'):
             return self._variable.get_subselections()
         return []
-    
-    def __set_variable_type(self, type):
+
+    @property
+    def variable_type(self):
+        return self._variable.__class__
+
+    @variable_type.setter
+    def variable_type(self, type):
         if not issubclass(type, ModelVariable):
             raise ValueError("type must be a subclass of ModelVariable")
 
@@ -67,17 +73,17 @@ class ModelVariableElement(QObject):
             "Info": [
                 Property("ID",
                     get=lambda _: self.id,
-                    type=StringPropertyType()
+                    prop_type=StringPropertyType()
                 ),
                 Property("Name",
                     get=lambda _: self.name,
-                    set=lambda name, _: setattr(self, 'name', name),
-                    type=StringPropertyType()
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='name'),
+                    prop_type=StringPropertyType()
                 ),
                 Property("Type",
                     get=lambda _: self._variable.__class__,
-                    set=lambda v, _: self.__set_variable_type(v),
-                    type=DropdownPropertyType(
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='variable_type'),
+                    prop_type=DropdownPropertyType(
                         options_callback=lambda _: {"Displacement": DisplacementVariable, "Distance": DistanceVariable}
                     )
                 )
@@ -201,25 +207,25 @@ class DisplacementVariable(ModelVariable):
             "Transform":[
                 Property("Node",
                     get=lambda _: self.node,
-                    set=lambda node, _: setattr(self, 'node', node),
-                    type=DropdownPropertyType(
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='node'),
+                    prop_type=DropdownPropertyType(
                         options_callback = lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes}
                     )
                 ),
                 Property("Axis X",
                     get = lambda _: self.axis_x,
-                    set = lambda v, _: setattr(self, 'axis_x', v),
-                    type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='axis_x'),
+                    prop_type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
                 ),
                 Property("Axis Y",
                     get = lambda _: self.axis_y,
-                    set = lambda v, _: setattr(self, 'axis_y', v),
-                    type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='axis_y'),
+                    prop_type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
                 ),
                 Property("Axis Z",
                     get = lambda _: self.axis_z,
-                    set = lambda v, _: setattr(self, 'axis_z', v),
-                    type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='axis_z'),
+                    prop_type=NumberPropertyType(multiplier=1e-3, step=1.0, decimals=2, suffix=" mm")
                 )
             ]
         }
@@ -301,15 +307,15 @@ class DistanceVariable(ModelVariable):
             "Transform":[
                 Property("Node A",
                     get=lambda _: self.node_a,
-                    set=lambda node, _: setattr(self, 'node_a', node),
-                    type=DropdownPropertyType(
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='node_a'),
+                    prop_type=DropdownPropertyType(
                         options_callback = lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.node_b}
                     )
                 ),
                 Property("Node B",
                     get=lambda _: self.node_b,
-                    set=lambda node, _: setattr(self, 'node_b', node),
-                    type=DropdownPropertyType(
+                    set=CommandFactory(ModifyElementCommand, element_id=self.id, property_name='node_b'),
+                    prop_type=DropdownPropertyType(
                         options_callback = lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.node_a}
                     )
                 ),
