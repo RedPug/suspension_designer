@@ -20,12 +20,12 @@ from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtCore import QByteArray
 
 from suspension_designer.editor.keybinds import Keybinds
-from suspension_designer.editor.elements import EditorNode, NodeGroup, ReferencePlane
-from suspension_designer.graphics.notifications import NotificationManager
+from suspension_designer.elements.nodes import EditorNode, NodeGroup
+from suspension_designer.user_interface.notifications import NotificationManager
 from suspension_designer.solver.model_variables import ModelVariableElement
-from suspension_designer.graphics.document import Document, DocumentManager
-from suspension_designer.graphics.rendering import Camera, CameraBasis, Viewport3D
-from suspension_designer.graphics.docks import PropertiesDock, TreeDock
+from suspension_designer.user_interface.document import Document, DocumentManager
+from suspension_designer.rendering.camera import CameraBasis
+from suspension_designer.user_interface.docks import PropertiesDock, TreeDock
 
 class TabBar(QTabBar):
     def __init__(self, main_window: 'MainWindow', document_manager: DocumentManager):
@@ -262,7 +262,8 @@ class MenuBar(QMenuBar):
         self.document_manager.current_document.scene_state.add_node(EditorNode(name="New Node", world_position=np.array([0.0, 0.0, 0.0])))
     
     def add_reference_plane(self):
-        self.document_manager.current_document.scene_state.add_reference_plane(ReferencePlane(name="New Plane", p0=np.array([0.0, 0.0, 0.0]), p1=np.array([1.0, 0.0, 0.0]), p2=np.array([0.0, 1.0, 0.0]), mode="containing"))
+        raise NotImplementedError("Adding reference planes is not implemented yet.")
+        # self.document_manager.current_document.scene_state.add_reference_plane(ReferencePlane(name="New Plane", p0=np.array([0.0, 0.0, 0.0]), p1=np.array([1.0, 0.0, 0.0]), p2=np.array([0.0, 1.0, 0.0]), mode="containing"))
 
     def add_group(self):
         self.document_manager.current_document.scene_state.add_group(NodeGroup(name="New Group", nodes=[]))

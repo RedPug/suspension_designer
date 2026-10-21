@@ -21,8 +21,8 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtGui import QBrush, QColor
 
-from suspension_designer.graphics.properties import GroupEditor, Property
-from suspension_designer.graphics.document import (
+from suspension_designer.user_interface.properties import GroupEditor, Property
+from suspension_designer.user_interface.document import (
     DOCK_PROPERTIES,
     DOCK_TREE,
     Document,

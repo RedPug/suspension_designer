@@ -31,14 +31,14 @@ from PySide6.QtGui import QClipboard, QKeySequence
 from suspension_designer.editor.commands import CommandManager
 from suspension_designer.editor.keybinds import Keybinds
 from suspension_designer.editor.keybinds import Keybinds
-from suspension_designer.graphics.notifications import NotificationManager
-from suspension_designer.graphics.properties import Property, StringPropertyEditorFactory
-from suspension_designer.graphics.rendering import Viewport3D
+from suspension_designer.user_interface.notifications import NotificationManager
+from suspension_designer.user_interface.properties import Property, StringPropertyEditorFactory
+from suspension_designer.rendering.viewport import Viewport3D
 from suspension_designer.solver.motion import MotionData, MotionTableWidget
 from suspension_designer.solver.result_viewer import ResultViewer
-from suspension_designer.graphics.selection import SelectionManager, Selectable
+from suspension_designer.user_interface.selection import SelectionManager, Selectable
 from suspension_designer.editor.scene import SceneState
-from suspension_designer.graphics.tree_model import SceneTreeModel
+from suspension_designer.user_interface.tree_model import SceneTreeModel
 from suspension_designer.solver.results_compiler import ResultsCompilation, ResultsCompiler
 from suspension_designer.data_manager import save_csv, save_json, get_filepath
 

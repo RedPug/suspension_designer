@@ -17,7 +17,7 @@ from suspension_designer.editor.commands import Command, CommandFactory, Command
 # Prevent circular imports during runtime type checking
 if TYPE_CHECKING:
     from suspension_designer.editor.elements import EditorNode
-    from suspension_designer.graphics.document import Document
+    from suspension_designer.user_interface.document import Document
 
 class Property:
     def __init__(

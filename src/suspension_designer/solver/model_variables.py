@@ -5,9 +5,9 @@ from PySide6.QtCore import (QObject, Signal)
 import numpy as np
 
 from suspension_designer.editor.commands import CommandFactory, LocalModifyElementCommandFactory, NonLocalModifyElementCommand, NonLocalModifyElementCommandFactory
-from suspension_designer.graphics.properties import DropdownPropertyEditorFactory, NumberPropertyEditorFactory, Property, StringPropertyEditorFactory
-from suspension_designer.editor.elements import EditorNode
-from suspension_designer.graphics.selection import Selectable
+from suspension_designer.user_interface.properties import DropdownPropertyEditorFactory, NumberPropertyEditorFactory, Property, StringPropertyEditorFactory
+from suspension_designer.elements.nodes import EditorNode
+from suspension_designer.user_interface.selection import Selectable
 
 class ModelVariableElement(Selectable):
 

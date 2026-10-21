@@ -13,7 +13,7 @@ import numpy as np
 
 from PySide6.QtCore import QObject, Signal
 
-from suspension_designer.graphics.notifications import NotificationManager
+from suspension_designer.user_interface.notifications import NotificationManager
 from suspension_designer.solver.motion import MotionData, MotionVariableData
 from suspension_designer.editor.scene import SceneState
 from suspension_designer.solver.solver import solve_at_time, SolverResult

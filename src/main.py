@@ -4,7 +4,7 @@ import numpy as np
 
 from PySide6.QtWidgets import QApplication
 
-from suspension_designer.graphics.document import Document
+from suspension_designer.user_interface.document import Document
 from suspension_designer.editor.graphics import MainWindow
 from suspension_designer.settings import SettingsManager
 from suspension_designer.solver.solver import Solver
@@ -28,6 +28,18 @@ def _background_compiler_warmup():
     except Exception as e:
         print(f"Failed to background compile: {e}")
 
+def _load_last_opened_files(window):
+    files = SettingsManager.get("last_opened_files")
+    if files:
+        for file in files:
+            if not os.path.exists(file):
+                print(f"Warning: Last opened file does not exist: {file}")
+                files.remove(file)
+
+        for file in files:
+            print(f"Loading last opened file: {file}")
+            doc = Document.load(file)
+            window.document_manager.add_document(doc, select=True)
 
 if __name__ == "__main__":
 
@@ -44,16 +56,6 @@ if __name__ == "__main__":
     window.resize(900, 600)
     window.show()
 
-    files = SettingsManager.get("last_opened_files")
-    if files:
-        for file in files:
-            if not os.path.exists(file):
-                print(f"Warning: Last opened file does not exist: {file}")
-                files.remove(file)
-
-        for file in files:
-            print(f"Loading last opened file: {file}")
-            doc = Document.load(file)
-            window.document_manager.add_document(doc, select=True)
+    _load_last_opened_files(window)
 
     app.exec()

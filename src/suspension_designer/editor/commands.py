@@ -8,7 +8,7 @@ from suspension_designer.editor.keybinds import Keybinds
 
 # Prevent circular imports during runtime type checking
 if TYPE_CHECKING:
-    from suspension_designer.graphics.document import Document, EditorDocument
+    from suspension_designer.user_interface.document import Document, EditorDocument
 
 class Command:
     @abstractmethod

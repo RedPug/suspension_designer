@@ -32,9 +32,9 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtGui import QClipboard, QKeySequence
 
-from suspension_designer.graphics.rendering import Viewport3D
+from suspension_designer.rendering.viewport import Viewport3D
 from suspension_designer.solver.results_compiler import ResultsCompilation
-from suspension_designer.graphics.selection import SelectionManager
+from suspension_designer.user_interface.selection import SelectionManager
 
 class CopyableTableWidget(QTableWidget):
     def __init__(self, parent=None):

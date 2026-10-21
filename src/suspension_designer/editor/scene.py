@@ -7,14 +7,16 @@ from PySide6.QtCore import (QObject, Signal)
 
 import numpy as np
 
+from suspension_designer.elements.geometry_builder import GeometryBuilder
+from suspension_designer.elements.geometry import ReferenceGeometryElement
 from suspension_designer.solver.model_variables import ModelVariableElement
-from suspension_designer.editor.elements import EditorNode, NodeGroup, ReferencePlane
+from suspension_designer.elements.nodes import EditorNode, NodeGroup
 
 
 class SceneState(QObject):
     did_change = Signal()  # Signal to emit when the scene state changes
 
-    def __init__(self, *, nodes: list[EditorNode] = [], edges: np.ndarray = np.array([]), groups: list[NodeGroup] = [], planes: list[ReferencePlane] = [], model_variables: list[ModelVariableElement] = [], is_editable: bool = True, name: str = "Unnamed Scene"):
+    def __init__(self, *, nodes: list[EditorNode] = [], edges: np.ndarray = np.array([]), groups: list[NodeGroup] = [], reference_geometry: list[ReferenceGeometryElement] = [], model_variables: list[ModelVariableElement] = [], is_editable: bool = True, name: str = "Unnamed Scene"):
         super().__init__()
         
         self._nodes = nodes
@@ -25,13 +27,13 @@ class SceneState(QObject):
     
         self._edges = edges
         self.is_editable = is_editable
-        if planes is None:
-            self.reference_planes: list[ReferencePlane] = []
+        if reference_geometry is None:
+            self._reference_geometry: list[ReferenceGeometryElement] = []
         else:
-            self.reference_planes = planes
+            self._reference_geometry = reference_geometry
 
-        for plane in self.reference_planes:
-            plane.did_change.connect(self.did_change.emit)
+        for element in self._reference_geometry:
+            element.did_change.connect(self.did_change.emit)
 
 
         self._groups = groups
@@ -49,14 +51,14 @@ class SceneState(QObject):
     def add_element(self, element):
         if isinstance(element, EditorNode):
             self.add_node(element)
-        elif isinstance(element, ReferencePlane):
-            self.add_reference_plane(element)
+        elif isinstance(element, ReferenceGeometryElement):
+            self.add_reference_geometry(element)
         elif isinstance(element, NodeGroup):
             self.add_group(element)
         elif isinstance(element, ModelVariableElement):
             self.add_model_variable(element)
         else:
-            raise ValueError("Element must be an EditorNode, ReferencePlane, NodeGroup, or ModelVariableElement")
+            raise ValueError("Element must be an EditorNode, ReferenceGeometryElement, NodeGroup, or ModelVariableElement")
 
     def add_node(self, node: EditorNode):
         self._nodes.append(node)
@@ -64,10 +66,10 @@ class SceneState(QObject):
         self._element_lookup |= {node.id: node}
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
-    def add_reference_plane(self, plane: ReferencePlane):
-        self.reference_planes.append(plane)
-        plane.did_change.connect(self.did_change.emit)
-        self._element_lookup |= {plane.id: plane}
+    def add_reference_geometry(self, element: ReferenceGeometryElement):
+        self._reference_geometry.append(element)
+        element.did_change.connect(self.did_change.emit)
+        self._element_lookup |= {element.id: element}
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_group(self, group: NodeGroup):
@@ -130,6 +132,24 @@ class SceneState(QObject):
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     @property
+    def reference_geometry(self) -> list[ReferenceGeometryElement]:
+        return self._reference_geometry
+
+    @reference_geometry.setter
+    def reference_geometry(self, value):
+        assert isinstance(value, list) and all(isinstance(element, ReferenceGeometryElement) for element in value), "Reference geometry must be a list of ReferenceGeometryElements"
+        
+        for element in self._reference_geometry:
+            element.did_change.disconnect(self.did_change.emit)
+
+        self._reference_geometry = value
+        self._element_lookup = None
+        for element in self._reference_geometry:
+            element.did_change.connect(self.did_change.emit)
+
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
+
+    @property
     def model_variables(self) -> list[ModelVariableElement]:
         return self._model_variables
 
@@ -151,8 +171,8 @@ class SceneState(QObject):
         if type(element) == EditorNode:
             self.nodes.remove(element)
             element.did_change.disconnect(self.did_change.emit)
-        elif type(element) == ReferencePlane:
-            self.reference_planes.remove(element)
+        elif isinstance(element, ReferenceGeometryElement):
+            self._reference_geometry.remove(element)
             element.did_change.disconnect(self.did_change.emit)
         elif type(element) == NodeGroup:
             self.groups.remove(element)
@@ -169,7 +189,7 @@ class SceneState(QObject):
 
     def get_element_by_id(self, id: UUID, force_refresh: bool = False):
         if self._element_lookup is None or force_refresh:
-            self._element_lookup = {node.id: node for node in self.nodes} | {plane.id: plane for plane in self.reference_planes} | {group.id: group for group in self.groups} | {variable.id: variable for variable in self._model_variables}
+            self._element_lookup = {node.id: node for node in self.nodes} | {element.id: element for element in self._reference_geometry} | {group.id: group for group in self.groups} | {variable.id: variable for variable in self._model_variables}
 
         return self._element_lookup.get(id, None)
     
@@ -182,26 +202,24 @@ class SceneState(QObject):
     def strip_reference(self) -> 'SceneState':
         # Create a new instance without any reference geometry
         scene = SceneState.from_dict(self.to_dict())
-        scene.reference_planes = []
+        scene._reference_geometry = []
         return scene
 
     def to_dict(self):
-        table = {
+        return {
             'name': self.name,
             'nodes': [node.to_dict() for node in self.nodes],
             'edges': self.edges.tolist(),
-            'planes': [plane.to_dict() for plane in self.reference_planes],
+            'geometry': [element.to_dict() for element in self._reference_geometry],
             'groups': [group.to_dict() for group in self.groups],
             'model_variables': [variable.to_dict() for variable in self.model_variables]
         }
-    
-        return table
 
     @staticmethod
     def from_dict(data: dict) -> 'SceneState':
         nodes = [EditorNode.from_dict(node_data) for node_data in data.get('nodes', [])]
         edges = np.array(data.get('edges', []), dtype=int)
-        planes = [ReferencePlane.from_dict(plane_data) for plane_data in data.get('planes', [])]
+        geometry = [ReferenceGeometryElement.from_dict(geom_data) for geom_data in data.get('geometry', [])]
         groups = [NodeGroup.from_dict(group_data) for group_data in data.get('groups', [])]
         variables = [ModelVariableElement.from_dict(variable_data) for variable_data in data.get("model_variables", [])]
         is_editable = data.get('is_editable', True)
@@ -209,10 +227,17 @@ class SceneState(QObject):
 
         id_to_element = (
               {node.id: node for node in nodes}
-            | {plane.id: plane for plane in planes}
+            | {element.id: element for element in geometry}
             | {group.id: group for group in groups}
             | {variable.id: variable for variable in variables}
             )
+
+        print()
+        print("Geometry Elements:")
+        for element in geometry:
+            print(f"  - {element.id}: {element.__class__.__name__} with constraints: {[str(c) for c in element._constraints]}")
+
+        print()
 
         for node in nodes:
             node.fill_references(id_to_element)
@@ -220,16 +245,18 @@ class SceneState(QObject):
         for group in groups:
             group.fill_references(id_to_element)
 
-        for plane in planes:
-            plane.fill_references(id_to_element)
+        for element in geometry:
+            element.fill_references(id_to_element)
 
         for element in variables:
             element.fill_references(id_to_element)
 
+        GeometryBuilder(geometry).rebuild_all_geometry()
+
         return SceneState(
             nodes=nodes,
             edges=edges,
-            planes=planes,
+            reference_geometry=geometry,
             groups=groups,
             model_variables=variables,
             is_editable=is_editable,
@@ -239,7 +266,7 @@ class SceneState(QObject):
     def restore(self, other: 'SceneState'):
         self.nodes = other.nodes
         self.edges = other.edges
-        self.reference_planes = other.reference_planes
+        self._reference_geometry = other._reference_geometry
         self.groups = other.groups
         self.model_variables = other.model_variables
         self.is_editable = other.is_editable

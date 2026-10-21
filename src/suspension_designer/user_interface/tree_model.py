@@ -4,6 +4,11 @@ from PySide6.QtCore import (QAbstractItemModel, QModelIndex, Qt)
 
 from suspension_designer.editor.scene import SceneState
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from suspension_designer.user_interface.document import EditorDocument
+
 
 class TreeItem:
     def __init__(self, name: str, *, parent=None, can_rename: bool = ..., can_select: bool = True, id=...):
@@ -32,7 +37,7 @@ class TreeItem:
         return self.parent.children.index(self)
     
 class SceneTreeModel(QAbstractItemModel):
-    def __init__(self, document, parent=None):
+    def __init__(self, document: 'EditorDocument', parent=None):
         super().__init__(parent)
 
         self.document = document
@@ -62,8 +67,8 @@ class SceneTreeModel(QAbstractItemModel):
         for group in scene.groups:
             groups.add_child(TreeItem(group.name, id=group.id))
 
-        for plane in scene.reference_planes:
-            planes.add_child(TreeItem(plane.name, id=plane.id))
+        for geometry in scene.reference_geometry:
+            planes.add_child(TreeItem(geometry.name, id=geometry.id))
 
         for element in scene.model_variables:
             model_variables.add_child(TreeItem(element.name, id=element.id))
