@@ -285,13 +285,11 @@ class PlaneGeometry(Geometry):
         assert isinstance(point1, PointGeometry), "First input must be a PointGeometry"
         assert isinstance(point2, PointGeometry), "Second input must be a PointGeometry"
         assert isinstance(point3, PointGeometry), "Third input must be a PointGeometry"
-        print("Creating plane from three points:", point1.pos, point2.pos, point3.pos)
         # plane passing through the three given points
         v1 = point2.pos - point1.pos
         v2 = point3.pos - point1.pos
         normal = np.cross(v1, v2)
         point_on_plane = (point1.pos + point2.pos + point3.pos) / 3
-        print("Computed normal:", normal, "Point on plane:", point_on_plane)
         return PlaneGeometry(normal, point_on_plane)
 
     @staticmethod

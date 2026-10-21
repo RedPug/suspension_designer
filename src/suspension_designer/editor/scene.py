@@ -232,13 +232,6 @@ class SceneState(QObject):
             | {variable.id: variable for variable in variables}
             )
 
-        print()
-        print("Geometry Elements:")
-        for element in geometry:
-            print(f"  - {element.id}: {element.__class__.__name__} with constraints: {[str(c) for c in element._constraints]}")
-
-        print()
-
         for node in nodes:
             node.fill_references(id_to_element)
 

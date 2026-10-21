@@ -71,7 +71,7 @@ class GeometryElement(EditorElement):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if hasattr(cls, 'type_name'):
-            print(f"Registering GeometryElement subclass: {cls.__name__} with type_name: {cls.type_name}")
+            # print(f"Registering GeometryElement subclass: {cls.__name__} with type_name: {cls.type_name}")
             GeometryElement._all_types.append(cls)
 
 class ReferenceGeometryElement(GeometryElement):
@@ -117,17 +117,18 @@ class ReferenceGeometryElement(GeometryElement):
 
     
     def fill_references(self, id_to_element: dict[UUID, EditorElement]):
-        print('filling references...')
+        # print('filling references...')
         for i, constraint in enumerate(self._constraints):
             if isinstance(constraint, UUID):
                 if constraint in id_to_element:
                     self._constraints[i] = id_to_element[constraint]
-                    print('filled reference for constraint', i, 'with id', constraint, 'to element', id_to_element[constraint].__str__())
+                    # print('filled reference for constraint', i, 'with id', constraint, 'to element', id_to_element[constraint].__str__())
                 else:
-                    print("constraint not found")
+                    # print("constraint not found")
+                    pass
 
         self._update_constraint_set()
-        print('done filling references')
+        # print('done filling references')
         print()
 
     def to_dict(self) -> dict:
@@ -160,13 +161,13 @@ class ReferenceGeometryElement(GeometryElement):
         for constraint_data in data.get('constraints', []):
             if 'id' in constraint_data:
                 element._constraints.append(UUID(constraint_data['id']))
-                print(f"Deserialized reference to element with ID: {constraint_data['id']}")
+                # print(f"Deserialized reference to element with ID: {constraint_data['id']}")
             else:
                 # If it's a literal geometry, we can create it directly
                 literal_element = LiteralGeometryElement.from_dict(constraint_data)
-                print("Deserialized literal geometry element:", literal_element)
+                # print("Deserialized literal geometry element:", literal_element)
                 element._constraints.append(literal_element)
-        print(f"Deserialized {element.__class__.__name__} with constraints: {[str(c) for c in element._constraints]}")
+        # print(f"Deserialized {element.__class__.__name__} with constraints: {[str(c) for c in element._constraints]}")
         return element
 
     def __str__(self):
@@ -374,7 +375,7 @@ class PlaneReferenceElement(ReferenceGeometryElement):
 
     def __init__(self, name: str, *, id:UUID = None):
         super().__init__(name, id=id)
-        print("Initializing PlaneReferenceElement with default geometry.")
+        # print("Initializing PlaneReferenceElement with default geometry.")
         self._geometry = PlaneGeometry(np.array([0, 0, 1]), np.zeros(3))
 
     def get_transform_property_list(self) -> list[Property]:
@@ -407,14 +408,8 @@ class PlaneReferenceElement(ReferenceGeometryElement):
 
     def rebuild_geometry(self):
         super().rebuild_geometry()
-        # sort constraint set in order of point, line, plane for consistent indexing
-        print("Rebuilding PlaneReferenceElement geometry with constraints:", self._constraint_set)
         
         geometries = self._get_sorted_geometries()
-        print("Sorted geometries:", [str(g) for g in geometries])
-        print("Constraints:", [str(c) for c in self._constraints])
-
-
 
         if self._constraint_set == Counter([PlaneGeometry]):
             self._geometry = PlaneGeometry.from_plane(geometries[0])

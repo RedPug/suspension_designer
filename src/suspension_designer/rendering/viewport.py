@@ -30,7 +30,7 @@ from suspension_designer.math import get_rotation_matrix_from_quaternion, quater
 from suspension_designer.elements.nodes import NodeGroup
 from suspension_designer.user_interface.selection import SelectionManager
 from suspension_designer.editor.scene import SceneState
-from suspension_designer.user_interface.colorpalette import ColorPalette, RenderingConfig
+from suspension_designer.user_interface.ui_config import ColorPalette, RenderingConfig
 from suspension_designer.rendering.camera import Camera, CameraBasis
 
 

@@ -34,4 +34,5 @@ class GeometryBuilder:
                 raise ValueError(f"Unknown GeometryElement type: {type(next_element)}")
 
         t1 = perf_counter()
-        print(f"Rebuilt all geometry in {(t1-t0)*1000:.4f} ms")
+        if t1-t0 > 0.01:
+            print("Warning: geometry rebuild took longer than expected:", (t1-t0)*1000, "ms")
