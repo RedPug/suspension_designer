@@ -121,11 +121,13 @@ class ReferenceGeometryElement(GeometryElement):
         for i, constraint in enumerate(self._constraints):
             if isinstance(constraint, UUID):
                 if constraint in id_to_element:
-                    self._constraints[i] = id_to_element[constraint]
+                    element = id_to_element[constraint]
+                    if not isinstance(element, GeometryElement):
+                        raise ValueError(f"Element with ID {constraint} is not a GeometryElement.")
+                    self._constraints[i] = element
                     # print('filled reference for constraint', i, 'with id', constraint, 'to element', id_to_element[constraint].__str__())
                 else:
-                    # print("constraint not found")
-                    pass
+                    raise ValueError(f"Element with ID {constraint} not found in id_to_element mapping.")
 
         self._update_constraint_set()
         # print('done filling references')
