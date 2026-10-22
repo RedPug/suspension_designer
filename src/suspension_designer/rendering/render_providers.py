@@ -161,7 +161,7 @@ def draw_plane(viewport, plane_element: PlaneReferenceElement):
     if plane_element == viewport.selection_manager.get_selected():
         glColor4f(*ColorPalette.REFERENCE_GEOMETRY_SELECTED)
     else:
-        glColor4f(*ColorPalette.REFERENCE_GEOMETRY_BASE)
+        glColor4f(*ColorPalette.REFERENCE_GEOMETRY)
     
 
     glBegin(GL_TRIANGLES)
@@ -202,7 +202,7 @@ def draw_point(viewport, point: PointReferenceElement):
     if point == viewport.selection_manager.get_selected():
         glColor4f(*ColorPalette.REFERENCE_GEOMETRY_SELECTED)  # Blue for selected points
     else:
-        glColor4f(*ColorPalette.REFERENCE_GEOMETRY_BASE)  # Orange for unselected points
+        glColor4f(*ColorPalette.REFERENCE_GEOMETRY)  # Orange for unselected points
 
     n = 40
     radius = RenderingConfig.REFERENCE_POINT_RADIUS
@@ -241,9 +241,9 @@ def draw_line(viewport, line: LineReferenceElement):
     c = viewport.camera.world_to_camera(np.array([line._geometry.point, line._geometry.direction * 1 + line._geometry.point]))
 
     if line == viewport.selection_manager.get_selected():
-        glColor4f(*ColorPalette.REFERENCE_GEOMETRY_SELECTED)  # Blue for selected lines
+        glColor4f(*ColorPalette.REFERENCE_LINE_SELECTED)
     else:
-        glColor4f(*ColorPalette.REFERENCE_GEOMETRY_BASE)  # Orange for unselected lines
+        glColor4f(*ColorPalette.REFERENCE_LINE)
 
 
     glLineWidth(5.0)

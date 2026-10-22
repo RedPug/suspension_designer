@@ -16,7 +16,7 @@ from suspension_designer.editor.commands import Command, CommandFactory, Command
 
 # Prevent circular imports during runtime type checking
 if TYPE_CHECKING:
-    from suspension_designer.editor.elements import EditorNode
+    from suspension_designer.elements.core import EditorElement
     from suspension_designer.user_interface.document import Document
 
 class Property:
@@ -73,19 +73,19 @@ class Property:
 class PropertyEditorFactory(ABC):
 
     @abstractmethod
-    def create_editor(self, parent):
+    def create_editor(self, parent: QWidget):
         ...
 
     @abstractmethod
-    def set_value(self, prop, value):
+    def set_value(self, prop: Property, value: Any):
         ...
 
     @abstractmethod
-    def get_value(self, prop):
+    def get_value(self, prop: Property):
         ...
 
     @abstractmethod
-    def connect_changed(self, prop, callback):
+    def connect_changed(self, prop: Property, callback):
         ...
 
 
@@ -322,13 +322,136 @@ class GroupEditor(QWidget):
 
 class GroupPropertyEditorFactory(PropertyEditorFactory):
 
-    def __init__(self, all_elements_callback: Callable[[Document], list['EditorNode']]):
+    def __init__(self, all_elements_callback: Callable[[Document], list['EditorElement']]):
         self.all_elements_callback = all_elements_callback
 
     def create_editor(self, parent):
         return GroupEditor(parent)
 
     def set_value(self, prop, value, document: Document):
+        prop.editor.set_nodes(
+            self.all_elements_callback(document),
+            value,
+        )
+
+    def get_value(self, prop, document: Document):
+        return prop.editor.selected_nodes()
+
+    def connect_changed(self, prop, callback):
+        prop.editor.valueChanged.connect(callback)
+
+
+class ReferenceGeometryEditor(QWidget):
+    valueChanged = Signal()
+
+    def __init__(self, parent=None):
+        t0 = perf_counter()
+        super().__init__(parent)
+
+        self._all_nodes = []
+        self._selected_nodes = []
+
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+
+        self.combo = QComboBox()
+        self.combo.currentIndexChanged.connect(self._on_add_node)
+        self.layout.addWidget(self.combo)
+
+        self.rows_layout = QVBoxLayout()
+        self.rows_layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.addLayout(self.rows_layout)
+
+        t1 = perf_counter()
+        # print(f"GroupEditor.__init__ took {t1-t0:.6f} seconds")
+
+    def set_nodes(self, all_nodes, selected_nodes):
+        self._all_nodes = list(all_nodes)
+        self._selected_nodes = list(selected_nodes)
+
+        self._rebuild()
+
+    def selected_nodes(self):
+        return list(self._selected_nodes)
+
+    def _rebuild(self):
+        t0 = perf_counter()
+        selected_ids = {node.id for node in self._selected_nodes}
+
+        # Remove old rows
+        while self.rows_layout.count():
+            item = self.rows_layout.takeAt(0)
+
+            if item.widget():
+                item.widget().deleteLater()
+
+        # Build dropdown
+        self.combo.blockSignals(True)
+        self.combo.clear()
+
+        self.combo.addItem("Add node...", None)
+
+        for node in self._all_nodes:
+            if node.id not in selected_ids:
+                self.combo.addItem(node.name, node)
+
+        self.combo.setCurrentIndex(0)
+        self.combo.blockSignals(False)
+
+        # Build rows
+        for node in self._selected_nodes:
+            row = QWidget()
+
+            layout = QHBoxLayout(row)
+            layout.setContentsMargins(0, 0, 0, 0)
+
+            layout.addWidget(QLabel(node.name))
+            layout.addStretch()
+
+            remove = QPushButton("✕")
+            remove.setMaximumWidth(24)
+
+            remove.clicked.connect(
+                lambda checked=False, n=node: self._remove_node(n)
+            )
+
+            layout.addWidget(remove)
+
+            self.rows_layout.addWidget(row)
+
+        self.rows_layout.addStretch()
+
+        t1 = perf_counter()
+        # print(f"GroupEditor._rebuild took {t1-t0:.6f} seconds")
+
+    def _on_add_node(self, index):
+        node = self.combo.itemData(index)
+
+        if node is None:
+            return
+
+        self._selected_nodes.append(node)
+
+        self._rebuild()
+
+        self.valueChanged.emit()
+
+    def _remove_node(self, node):
+        self._selected_nodes.remove(node)
+
+        self._rebuild()
+
+        self.valueChanged.emit()
+
+class ReferenceGeometryPropertyEditorFactory(PropertyEditorFactory):
+
+    def __init__(self, all_elements_callback: Callable[[Document], list['EditorElement']]):
+        self.all_elements_callback = all_elements_callback
+
+    def create_editor(self, parent):
+        return GroupEditor(parent)
+
+    def set_value(self, prop: Property, value, document: Document):
         prop.editor.set_nodes(
             self.all_elements_callback(document),
             value,

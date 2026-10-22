@@ -1,12 +1,12 @@
 import numpy as np
 
-ALL_GEOMETRIES: list[type['Geometry']] = []
-
 # representation of a certain number of DOF restrictions.
 class Geometry():
+    ALL_GEOMETRIES: list[type['Geometry']] = []
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        ALL_GEOMETRIES.append(cls)
+        Geometry.ALL_GEOMETRIES.append(cls)
 
     def to_dict(self) -> dict:
         return {
@@ -19,7 +19,7 @@ class Geometry():
             raise NotImplementedError("from_dict should be called on the base Geometry class, not a subclass.")
         
         geometry_type = data.get("type")
-        for geometry_cls in ALL_GEOMETRIES:
+        for geometry_cls in Geometry.ALL_GEOMETRIES:
             if geometry_cls.__name__ == geometry_type:
                 return geometry_cls.from_dict(data)
             

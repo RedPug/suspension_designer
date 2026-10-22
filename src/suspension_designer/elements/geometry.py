@@ -100,8 +100,8 @@ class ReferenceGeometryElement(GeometryElement):
 
     def get_available_constraint_types(self) -> list['GeometryElement']:
         # also account for the case when adding this constraint doesn't make a full set, but only a partial set, so all counters <= the valid sets
-        available_constraints = []
-        for added_constraint in Geometry._all_types:
+        available_constraints: list[type[Geometry]] = []
+        for added_constraint in Geometry.ALL_GEOMETRIES:
             new_constraint_set = self._constraint_set + Counter([added_constraint])
 
             if any(new_constraint_set <= valid_set for valid_set in self.__class__.get_valid_reference_sets()):
