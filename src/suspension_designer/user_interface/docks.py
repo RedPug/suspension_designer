@@ -40,6 +40,7 @@ class TreeDock(QDockWidget):
         self.document_manager = document_manager
 
         self.current_doc = None
+        self._current_scene_state = None
 
         self.document_manager.selection_changed.connect(self.setDocument)
 
@@ -77,10 +78,13 @@ class TreeDock(QDockWidget):
         if self.current_doc:
             self.current_doc.did_change.disconnect(self.refreshTree)
             self.current_doc.selection_manager.selection_changed.disconnect(self.restoreSelection)
+            if self._current_scene_state is not None:
+                self._current_scene_state.did_change.disconnect(self.refreshTree)
 
         self.current_doc = document
 
         if document is None:
+            self._current_scene_state = None
             self.tree.setModel(None)
             return
         
@@ -89,6 +93,9 @@ class TreeDock(QDockWidget):
         )
 
         document.did_change.connect(self.refreshTree)
+        self._current_scene_state = getattr(document, "scene_state", None)
+        if self._current_scene_state is not None:
+            self._current_scene_state.did_change.connect(self.refreshTree)
 
         self.tree.setModel(document.create_tree_model())
 
@@ -310,9 +317,10 @@ class PropertiesDock(QDockWidget):
             partial(self.on_property_changed, prop)
         )
 
-        scene_state = self.document_manager.current_document.scene_state
-        
-        prop.refresh(scene_state)
+        document = self.document_manager.current_document
+        scene_state = document.scene_state
+
+        prop.refresh(document)
         
         editor.setEnabled(prop.editable and scene_state.is_editable)
 
@@ -321,10 +329,7 @@ class PropertiesDock(QDockWidget):
     # ---------------------------------------------------------
 
     def on_property_changed(self, prop: Property):
-        if hasattr(self.document_manager.current_document, 'scene_state'):
-            prop.commit(self.document_manager.current_document.scene_state)
-        else:
-            prop.commit(None)
+        prop.commit(self.document_manager.current_document)
 
     # ---------------------------------------------------------
 

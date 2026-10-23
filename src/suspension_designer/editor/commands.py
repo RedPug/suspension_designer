@@ -44,6 +44,8 @@ class NonLocalModifyElementCommand(NonLocalCommand):
         if element:
             # print("Modifying element", self._element_id, "property", self._property_name, "to", self._new_value)
             setattr(element, self._property_name, self._new_value)
+            from suspension_designer.elements.geometry_builder import GeometryBuilder
+            GeometryBuilder(document.scene_state.reference_geometry).rebuild_all_geometry()
             # print("Element modified:", element)
         else:
             print("Element not found:", self._element_id)

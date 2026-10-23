@@ -37,14 +37,25 @@ class GeometryBuilder:
         while remaining_elements:
             iterations += 1
             if iterations > max_iterations:
-                raise RuntimeError("Geometry rebuild failed to converge")
+                break
 
             next_element = remaining_elements.popleft()
             if isinstance(next_element, LiteralGeometryElement):
                 print("Warning: LiteralGeometryElement should not be in the rebuild queue. It should be rebuilt as a dependency of a ReferenceGeometryElement.")
                 pass
             elif isinstance(next_element, ReferenceGeometryElement):
-                if all(constraint in built_elements or isinstance(constraint, LiteralGeometryElement) for constraint in next_element._constraints):
+                if not next_element.is_fully_defined():
+                    continue
+                if all(
+                    constraint in built_elements
+                    or isinstance(constraint, LiteralGeometryElement)
+                    or (
+                        not isinstance(constraint, ReferenceGeometryElement)
+                        and hasattr(constraint, "_geometry")
+                        and constraint._geometry is not None
+                    )
+                    for constraint in next_element._constraints
+                ):
                     # literal constraints are always considered "built" since they don't need to be rebuilt
                     next_element.rebuild_geometry()
                     built_elements.append(next_element)

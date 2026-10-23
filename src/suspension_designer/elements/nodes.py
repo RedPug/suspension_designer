@@ -9,6 +9,7 @@ import numpy as np
 # from src.solver import SolverState, solve_system, SolverResult
 from suspension_designer.editor.commands import CommandFactory, LocalModifyElementCommand, LocalModifyElementCommandFactory, NonLocalModifyElementCommand, NonLocalModifyElementCommandFactory
 from suspension_designer.elements.core import EditorElement
+from suspension_designer.geometry_core import PointGeometry
 from suspension_designer.user_interface.properties import DropdownPropertyEditorFactory, GroupPropertyEditorFactory, NumberPropertyEditorFactory, Property, StringPropertyEditorFactory
 # from src.scene import SceneState
 from suspension_designer.user_interface.selection import Selectable
@@ -21,6 +22,7 @@ class EditorNode(EditorElement):
         super().__init__(name, id=id)
 
         self._world_position = world_position
+        self._geometry = PointGeometry(self._world_position)
 
     @property
     def world_position(self):
@@ -32,6 +34,7 @@ class EditorNode(EditorElement):
 
     def set_world_position(self, value, ignore_direction: Optional[np.ndarray] = None):
         self._world_position = value
+        self._geometry.pos = self._world_position
         self.did_change.emit()
 
     @property
@@ -162,7 +165,7 @@ class NodeGroup(EditorElement):
                 Property("Contains",
                     get = lambda _: self.nodes,
                     set = LocalModifyElementCommandFactory(element_id=self.id, property_name='nodes'),
-                    prop_editor = GroupPropertyEditorFactory(all_elements_callback = lambda doc: doc.scene.nodes)
+                    prop_editor = GroupPropertyEditorFactory(all_elements_callback = lambda doc: doc.scene_state.nodes)
                 ),
             ]
         }

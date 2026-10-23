@@ -20,6 +20,7 @@ from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtCore import QByteArray
 
 from suspension_designer.editor.keybinds import Keybinds
+from suspension_designer.elements.geometry import LineReferenceElement, PlaneReferenceElement, PointReferenceElement
 from suspension_designer.elements.nodes import EditorNode, NodeGroup
 from suspension_designer.user_interface.notifications import NotificationManager
 from suspension_designer.solver.model_variables import ModelVariableElement
@@ -194,15 +195,17 @@ class MenuBar(QMenuBar):
 
         add_menu = self.addMenu("Insert")
         add_menu.addAction("Node").triggered.connect(lambda: self.add_node())
-        add_menu.addAction("Plane").triggered.connect(lambda: self.add_reference_plane())
         add_menu.addAction("Group").triggered.connect(lambda: self.add_group())
+        add_menu.addAction("Point").triggered.connect(lambda: self.add_point())
+        add_menu.addAction("Line").triggered.connect(lambda: self.add_line())
+        add_menu.addAction("Plane").triggered.connect(lambda: self.add_plane())
         add_menu.addAction("Variable").triggered.connect(lambda: self.add_model_variable())
 
     def save_as_scene(self):
-        pass
+        self.document_manager.save_current_as()
 
     def save_scene(self):
-        self.document_manager.s
+        self.document_manager.save_current()
         pass
 
     def sync_docks(self, document: Document | None):
@@ -260,16 +263,21 @@ class MenuBar(QMenuBar):
 
     def add_node(self):
         self.document_manager.current_document.scene_state.add_node(EditorNode(name="New Node", world_position=np.array([0.0, 0.0, 0.0])))
-    
-    def add_reference_plane(self):
-        raise NotImplementedError("Adding reference planes is not implemented yet.")
-        # self.document_manager.current_document.scene_state.add_reference_plane(ReferencePlane(name="New Plane", p0=np.array([0.0, 0.0, 0.0]), p1=np.array([1.0, 0.0, 0.0]), p2=np.array([0.0, 1.0, 0.0]), mode="containing"))
 
     def add_group(self):
         self.document_manager.current_document.scene_state.add_group(NodeGroup(name="New Group", nodes=[]))
 
     def add_model_variable(self):
-        self.document_manager.current_document.scene_state.add_model_variable(ModelVariableElement())
+        self.document_manager.current_document.scene_state.add_model_variable(ModelVariableElement("New Variable"))
+
+    def add_point(self):
+        self.document_manager.current_document.scene_state.add_reference_geometry(PointReferenceElement("New Point"))
+
+    def add_line(self):
+        self.document_manager.current_document.scene_state.add_reference_geometry(LineReferenceElement("New Line"))
+
+    def add_plane(self):
+        self.document_manager.current_document.scene_state.add_reference_geometry(PlaneReferenceElement("New Plane"))
 
 class StatusBar(QStatusBar):
     def __init__(self, parent=None):

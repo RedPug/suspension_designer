@@ -8,7 +8,7 @@ from uuid import UUID
 
 from collections import Counter
 from suspension_designer.geometry_core import Geometry, ScalarGeometry, PointGeometry, LineGeometry, PlaneGeometry
-from suspension_designer.user_interface.properties import DropdownPropertyEditorFactory, NumberPropertyEditorFactory, StringPropertyEditorFactory, Property
+from suspension_designer.user_interface.properties import ButtonPropertyEditorFactory, DropdownPropertyEditorFactory, NumberPropertyEditorFactory, ReferenceGeometryPropertyEditorFactory, StringPropertyEditorFactory, Property
 
 
 # Base class builds from other reference elements. Each should specify how to build it from other elements
@@ -80,15 +80,25 @@ class ReferenceGeometryElement(GeometryElement):
 
         self._constraints: list[GeometryElement] = []
         self._constraint_set: Counter[GeometryElement] = Counter()
+        self._visible = True
         self._update_constraint_set()
+
+    @property
+    def visible(self):
+        return self._visible
+
+    @visible.setter
+    def visible(self, value):
+        self._visible = bool(value)
+        self.did_change.emit()
 
     def _get_sorted_geometries(self) -> list[Geometry]:
         geometries = [self._constraints[i]._geometry for i in range(len(self._constraints))]
         geometries.sort(
             key=lambda c: 
-            (isinstance(c, ScalarGeometry), 
-             isinstance(c, PointGeometry), 
-             isinstance(c, LineGeometry), 
+            (isinstance(c, ScalarGeometry),
+             isinstance(c, PointGeometry),
+             isinstance(c, LineGeometry),
              isinstance(c, PlaneGeometry)
             ), 
             reverse=True
@@ -96,17 +106,74 @@ class ReferenceGeometryElement(GeometryElement):
         return geometries
 
     def _update_constraint_set(self):
-        self._constraint_set = Counter(constraint._geometry.__class__ for constraint in self._constraints)
+        self._constraint_set = Counter(
+            constraint._geometry.__class__
+            for constraint in self._constraints
+            if getattr(constraint, "_geometry", None) is not None
+        )
 
-    def get_available_constraint_types(self) -> list['GeometryElement']:
+    def get_property_list(self) -> dict[str, list[Property]]:
+        properties = super().get_property_list()
+        transform_properties = properties.pop("Transform")
+        properties["Info"].append(
+            Property(
+                "Visibility",
+                get=lambda _: self.visible,
+                set=LocalModifyElementCommandFactory(
+                    element_id=self.id,
+                    property_name="visible",
+                ),
+                prop_editor=ButtonPropertyEditorFactory(),
+            )
+        )
+        factory = ReferenceGeometryPropertyEditorFactory(
+            all_elements_callback=lambda doc: (
+                [
+                    element
+                    for element in doc.scene_state.reference_geometry
+                    if element.id != self.id
+                ]
+                + list(doc.scene_state.nodes)
+            ),
+            available_types_callback=lambda _, constraints: (
+                self.get_available_constraint_types(constraints)
+            ),
+            element_id=self.id,
+            literal_factory=lambda geometry_type: {
+                ScalarGeometry: LiteralScalarElement,
+                PointGeometry: LiteralPointElement,
+                LineGeometry: LiteralLineElement,
+                PlaneGeometry: LiteralPlaneElement,
+            }[geometry_type](),
+        )
+        properties["Constraints"] = [
+            Property(
+                "",
+                get=lambda _: list(self._constraints),
+                set=factory,
+                prop_editor=factory,
+            )
+        ]
+        properties["Transform"] = transform_properties
+        return properties
+
+    def get_available_constraint_types(
+        self,
+        constraints: list[GeometryElement] = None,
+    ) -> list[type[Geometry]]:
         # also account for the case when adding this constraint doesn't make a full set, but only a partial set, so all counters <= the valid sets
         available_constraints: list[type[Geometry]] = []
+        constraints = self._constraints if constraints is None else constraints
+        current_set = Counter(
+            constraint._geometry.__class__
+            for constraint in constraints
+            if getattr(constraint, "_geometry", None) is not None
+        )
         for added_constraint in Geometry.ALL_GEOMETRIES:
-            new_constraint_set = self._constraint_set + Counter([added_constraint])
+            new_constraint_set = current_set + Counter([added_constraint])
 
             if any(new_constraint_set <= valid_set for valid_set in self.__class__.get_valid_reference_sets()):
                 available_constraints.append(added_constraint)
-        
         return available_constraints
 
     def does_reference_element(self, id: UUID) -> bool:
@@ -122,7 +189,7 @@ class ReferenceGeometryElement(GeometryElement):
             if isinstance(constraint, UUID):
                 if constraint in id_to_element:
                     element = id_to_element[constraint]
-                    if not isinstance(element, GeometryElement):
+                    if not isinstance(element, GeometryElement) and not hasattr(element, "_geometry"):
                         raise ValueError(f"Element with ID {constraint} is not a GeometryElement.")
                     self._constraints[i] = element
                     # print('filled reference for constraint', i, 'with id', constraint, 'to element', id_to_element[constraint].__str__())
@@ -130,8 +197,7 @@ class ReferenceGeometryElement(GeometryElement):
                     raise ValueError(f"Element with ID {constraint} not found in id_to_element mapping.")
 
         self._update_constraint_set()
-        # print('done filling references')
-        print()
+
 
     def to_dict(self) -> dict:
         constraints = []
@@ -145,6 +211,7 @@ class ReferenceGeometryElement(GeometryElement):
             "name": self.name,
             "id": str(self.id),
             "type": self.__class__.type_name,
+            "visible": self.visible,
             "constraints": constraints
         }
 
@@ -159,6 +226,7 @@ class ReferenceGeometryElement(GeometryElement):
             raise ValueError(f"Class {cls.__name__} is not a subclass of ReferenceGeometryElement.")
         
         element = cls(name=data['name'], id=UUID(data['id']))
+        element.visible = data.get("visible", True)
         element._constraints = []
         for constraint_data in data.get('constraints', []):
             if 'id' in constraint_data:
@@ -176,6 +244,8 @@ class ReferenceGeometryElement(GeometryElement):
         return f"{self.__class__.__name__}(name={self.name}, id={self.id}, constraints={[c for c in self._constraints]})"
 
 class LiteralGeometryElement(GeometryElement):
+    is_literal_geometry = True
+
     def __init__(self, geometry: Geometry):
         super().__init__(name=geometry.__class__.__name__)
         self._geometry = geometry
@@ -431,7 +501,7 @@ class PlaneReferenceElement(ReferenceGeometryElement):
 class LiteralScalarElement(LiteralGeometryElement, ScalarReferenceElement):
     type_name="literal_scalar"
 
-    def __init__(self, value: float, *, id:UUID = None):
+    def __init__(self, value: float = 0.0, *, id:UUID = None):
         super().__init__(ScalarGeometry(value))
         self._geometry: ScalarGeometry
 
@@ -457,8 +527,8 @@ class LiteralPointElement(LiteralGeometryElement, PointReferenceElement):
     type_name="literal_point"
     
 
-    def __init__(self, point: np.ndarray, *, id:UUID = None):
-        super().__init__(PointGeometry(point))
+    def __init__(self, point: np.ndarray = None, *, id:UUID = None):
+        super().__init__(PointGeometry(np.zeros(3) if point is None else point))
         self._geometry: PointGeometry
 
     @property
@@ -468,6 +538,7 @@ class LiteralPointElement(LiteralGeometryElement, PointReferenceElement):
     @x.setter
     def x(self, new_x: float):
         self._geometry.pos[0] = new_x
+        self.did_change.emit()
 
     @property
     def y(self) -> float:
@@ -476,6 +547,7 @@ class LiteralPointElement(LiteralGeometryElement, PointReferenceElement):
     @y.setter
     def y(self, new_y: float):
         self._geometry.pos[1] = new_y
+        self.did_change.emit()
 
     @property
     def z(self) -> float:
@@ -484,23 +556,24 @@ class LiteralPointElement(LiteralGeometryElement, PointReferenceElement):
     @z.setter
     def z(self, new_z: float):
         self._geometry.pos[2] = new_z
+        self.did_change.emit()
 
     def get_transform_property_list(self) -> list[Property]:
         return [
             Property("X",
                 get=lambda _: self.x,
                 set=NonLocalModifyElementCommandFactory(element_id=self.id, property_name='x'),
-                prop_editor=NumberPropertyEditorFactory(multiplier=1.0, step=0.1, decimals=3)
+                prop_editor=NumberPropertyEditorFactory(multiplier=1.0e-3, step=0.1, decimals=3, suffix=" mm")
             ),
             Property("Y",
                 get=lambda _: self.y,
                 set=NonLocalModifyElementCommandFactory(element_id=self.id, property_name='y'),
-                prop_editor=NumberPropertyEditorFactory(multiplier=1.0, step=0.1, decimals=3)
+                prop_editor=NumberPropertyEditorFactory(multiplier=1.0e-3, step=0.1, decimals=3, suffix=" mm")
             ),
             Property("Z",
                 get=lambda _: self.z,
                 set=NonLocalModifyElementCommandFactory(element_id=self.id, property_name='z'),
-                prop_editor=NumberPropertyEditorFactory(multiplier=1.0, step=0.1, decimals=3)
+                prop_editor=NumberPropertyEditorFactory(multiplier=1.0e-3, step=0.1, decimals=3, suffix=" mm")
             )
         ]
 
@@ -516,3 +589,127 @@ class LiteralPointElement(LiteralGeometryElement, PointReferenceElement):
             raise ValueError("from_dict should be called on LiteralPointElement class, not subclasses.")
         
         return cls(point=np.array(data['point']))
+
+
+class LiteralLineElement(LiteralGeometryElement, LineReferenceElement):
+    type_name = "literal_line"
+
+    def __init__(self, point=None, direction=None, *, id: UUID = None):
+        super().__init__(
+            LineGeometry(
+                np.zeros(3) if point is None else point,
+                np.array([1.0, 0.0, 0.0]) if direction is None else direction,
+            )
+        )
+
+    def get_transform_property_list(self) -> list[Property]:
+        return [
+            Property(
+                name,
+                get=lambda _, attribute=attribute: getattr(self._geometry, attribute)[index],
+                set=NonLocalModifyElementCommandFactory(
+                    element_id=self.id,
+                    property_name=property_name,
+                ),
+                prop_editor=NumberPropertyEditorFactory(
+                    multiplier=multiplier,
+                    step=step,
+                    decimals=decimals,
+                    suffix=suffix,
+                ),
+            )
+            for name, attribute, index, property_name, multiplier, step, decimals, suffix in [
+                ("Point X", "point", 0, "point_x", 1e-3, 1, 2, " mm"),
+                ("Point Y", "point", 1, "point_y", 1e-3, 1, 2, " mm"),
+                ("Point Z", "point", 2, "point_z", 1e-3, 1, 2, " mm"),
+                ("Direction X", "direction", 0, "direction_x", 1.0, 1, 3, ""),
+                ("Direction Y", "direction", 1, "direction_y", 1.0, 1, 3, ""),
+                ("Direction Z", "direction", 2, "direction_z", 1.0, 1, 3, ""),
+            ]
+        ]
+
+    def _component_property(name, attribute, index):
+        def getter(self):
+            return getattr(self._geometry, attribute)[index]
+
+        def setter(self, value):
+            getattr(self._geometry, attribute)[index] = value
+            self.did_change.emit()
+
+        return property(getter, setter)
+
+    point_x = _component_property("point_x", "point", 0)
+    point_y = _component_property("point_y", "point", 1)
+    point_z = _component_property("point_z", "point", 2)
+    direction_x = _component_property("direction_x", "direction", 0)
+    direction_y = _component_property("direction_y", "direction", 1)
+    direction_z = _component_property("direction_z", "direction", 2)
+
+    def to_dict(self) -> dict:
+        return {"type": self.type_name} | self._geometry.to_dict()
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'LiteralLineElement':
+        return cls(data["point"], data["direction"])
+
+
+class LiteralPlaneElement(LiteralGeometryElement, PlaneReferenceElement):
+    type_name = "literal_plane"
+
+    def __init__(self, normal=None, point=None, *, id: UUID = None):
+        super().__init__(
+            PlaneGeometry(
+                np.array([0.0, 0.0, 1.0]) if normal is None else normal,
+                np.zeros(3) if point is None else point,
+            )
+        )
+
+    def get_transform_property_list(self) -> list[Property]:
+        return [
+            Property(
+                name,
+                get=lambda _, attribute=attribute: getattr(self._geometry, attribute)[index],
+                set=NonLocalModifyElementCommandFactory(
+                    element_id=self.id,
+                    property_name=property_name,
+                ),
+                prop_editor=NumberPropertyEditorFactory(
+                    multiplier=multiplier,
+                    step=step,
+                    decimals=decimals,
+                    suffix=suffix,
+                ),
+            )
+            for name, attribute, index, property_name, multiplier, step, decimals, suffix in [
+                ("Point X", "point", 0, "point_x", 1e-3, 1, 2, " mm"),
+                ("Point Y", "point", 1, "point_y", 1e-3, 1, 2, " mm"),
+                ("Point Z", "point", 2, "point_z", 1e-3, 1, 2, " mm"),
+                ("Normal X", "normal", 0, "normal_x", 1.0, 1, 3, ""),
+                ("Normal Y", "normal", 1, "normal_y", 1.0, 1, 3, ""),
+                ("Normal Z", "normal", 2, "normal_z", 1.0, 1, 3, ""),
+            ]
+        ]
+
+    def _component_property(name, attribute, index):
+        def getter(self):
+            return getattr(self._geometry, attribute)[index]
+
+        def setter(self, value):
+            getattr(self._geometry, attribute)[index] = value
+            self.did_change.emit()
+
+        return property(getter, setter)
+
+    point_x = _component_property("point_x", "point", 0)
+    point_y = _component_property("point_y", "point", 1)
+    point_z = _component_property("point_z", "point", 2)
+    normal_x = _component_property("normal_x", "normal", 0)
+    normal_y = _component_property("normal_y", "normal", 1)
+    normal_z = _component_property("normal_z", "normal", 2)
+
+    def to_dict(self) -> dict:
+        return {"type": self.type_name} | self._geometry.to_dict()
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'LiteralPlaneElement':
+        return cls(data["normal"], data["point"])

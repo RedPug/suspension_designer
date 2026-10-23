@@ -15,13 +15,15 @@ from suspension_designer.elements.nodes import EditorNode, NodeGroup
 
 class SceneState(QObject):
     did_change = Signal()  # Signal to emit when the scene state changes
+    element_added = Signal(object)
+    element_removed = Signal(object)
 
     def __init__(self, *, nodes: list[EditorNode] = [], edges: np.ndarray = np.array([]), groups: list[NodeGroup] = [], reference_geometry: list[ReferenceGeometryElement] = [], model_variables: list[ModelVariableElement] = [], is_editable: bool = True, name: str = "Unnamed Scene"):
         super().__init__()
         
         self._nodes = nodes
         for node in self._nodes:
-            node.did_change.connect(self.did_change.emit)
+            node.did_change.connect(self._on_node_changed)
 
         self._element_lookup = None
     
@@ -34,6 +36,7 @@ class SceneState(QObject):
 
         for element in self._reference_geometry:
             element.did_change.connect(self.did_change.emit)
+            self._connect_constraint_changes(element)
 
 
         self._groups = groups
@@ -48,6 +51,15 @@ class SceneState(QObject):
 
         self.id = uuid4()  # Unique identifier for the scene
 
+    def _on_node_changed(self):
+        GeometryBuilder(self._reference_geometry).rebuild_all_geometry()
+        self.did_change.emit()
+
+    def _connect_constraint_changes(self, element: ReferenceGeometryElement):
+        for constraint in element._constraints:
+            if hasattr(constraint, "did_change"):
+                constraint.did_change.connect(self.did_change.emit)
+
     def add_element(self, element):
         if isinstance(element, EditorNode):
             self.add_node(element)
@@ -57,31 +69,56 @@ class SceneState(QObject):
             self.add_group(element)
         elif isinstance(element, ModelVariableElement):
             self.add_model_variable(element)
+        elif isinstance(element, ReferenceGeometryElement):
+            self.add_reference_geometry(element)
         else:
             raise ValueError("Element must be an EditorNode, ReferenceGeometryElement, NodeGroup, or ModelVariableElement")
 
     def add_node(self, node: EditorNode):
         self._nodes.append(node)
-        node.did_change.connect(self.did_change.emit)
+        node.did_change.connect(self._on_node_changed)
+        if self._element_lookup is None:
+            self._element_lookup = {}
         self._element_lookup |= {node.id: node}
+        self.element_added.emit(node)
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_reference_geometry(self, element: ReferenceGeometryElement):
         self._reference_geometry.append(element)
         element.did_change.connect(self.did_change.emit)
+        self._connect_constraint_changes(element)
+        if self._element_lookup is None:
+            self._element_lookup = {}
         self._element_lookup |= {element.id: element}
+        self.element_added.emit(element)
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_group(self, group: NodeGroup):
         self._groups.append(group)
         group.did_change.connect(self.did_change.emit)
+        if self._element_lookup is None:
+            self._element_lookup = {}
         self._element_lookup |= {group.id: group}
+        self.element_added.emit(group)
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def add_model_variable(self, variable: ModelVariableElement):
         self._model_variables.append(variable)
         variable.did_change.connect(self.did_change.emit)
+        if self._element_lookup is None:
+            self._element_lookup = {}
         self._element_lookup |= {variable.id: variable}
+        self.element_added.emit(variable)
+        self.did_change.emit()  # Emit signal to notify that the scene has changed
+
+    def add_reference_geometry(self, element: ReferenceGeometryElement):
+        self._reference_geometry.append(element)
+        element.did_change.connect(self.did_change.emit)
+        self._connect_constraint_changes(element)
+        if self._element_lookup is None:
+            self._element_lookup = {}
+        self._element_lookup |= {element.id: element}
+        self.element_added.emit(element)
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     @property
@@ -93,12 +130,12 @@ class SceneState(QObject):
         assert isinstance(value, list) and all(isinstance(node, EditorNode) for node in value), "Nodes must be a list of EditorNodes"
         
         for node in self._nodes:
-            node.did_change.disconnect(self.did_change.emit)
+            node.did_change.disconnect(self._on_node_changed)
 
         self._nodes = value
         self._element_lookup = None
         for node in self._nodes:
-            node.did_change.connect(self.did_change.emit)
+            node.did_change.connect(self._on_node_changed)
 
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
@@ -146,6 +183,7 @@ class SceneState(QObject):
         self._element_lookup = None
         for element in self._reference_geometry:
             element.did_change.connect(self.did_change.emit)
+            self._connect_constraint_changes(element)
 
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
@@ -170,10 +208,13 @@ class SceneState(QObject):
     def delete_element(self, element):
         if type(element) == EditorNode:
             self.nodes.remove(element)
-            element.did_change.disconnect(self.did_change.emit)
+            element.did_change.disconnect(self._on_node_changed)
         elif isinstance(element, ReferenceGeometryElement):
             self._reference_geometry.remove(element)
             element.did_change.disconnect(self.did_change.emit)
+            for constraint in element._constraints:
+                if hasattr(constraint, "did_change"):
+                    constraint.did_change.disconnect(self.did_change.emit)
         elif type(element) == NodeGroup:
             self.groups.remove(element)
             element.did_change.disconnect(self.did_change.emit)
@@ -185,13 +226,23 @@ class SceneState(QObject):
 
         self._element_lookup.pop(element.id, None)
         
+        self.element_removed.emit(element)
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 
     def get_element_by_id(self, id: UUID, force_refresh: bool = False):
         if self._element_lookup is None or force_refresh:
             self._element_lookup = {node.id: node for node in self.nodes} | {element.id: element for element in self._reference_geometry} | {group.id: group for group in self.groups} | {variable.id: variable for variable in self._model_variables}
 
-        return self._element_lookup.get(id, None)
+        element = self._element_lookup.get(id, None)
+        if element is not None:
+            return element
+
+        for reference_geometry in self._reference_geometry:
+            for constraint in reference_geometry._constraints:
+                if getattr(constraint, "id", None) == id:
+                    return constraint
+
+        return None
     
     def update_node_positions(self, node_positions: np.ndarray):
         for i, node in enumerate(self.nodes):
@@ -257,6 +308,12 @@ class SceneState(QObject):
         )
     
     def restore(self, other: 'SceneState'):
+        for element in self._reference_geometry:
+            element.did_change.disconnect(self.did_change.emit)
+            for constraint in element._constraints:
+                if hasattr(constraint, "did_change"):
+                    constraint.did_change.disconnect(self.did_change.emit)
+
         self.nodes = other.nodes
         self.edges = other.edges
         self._reference_geometry = other._reference_geometry
@@ -265,6 +322,9 @@ class SceneState(QObject):
         self.is_editable = other.is_editable
 
         self._element_lookup = None
+        for element in self._reference_geometry:
+            element.did_change.connect(self.did_change.emit)
+            self._connect_constraint_changes(element)
 
         self.did_change.emit()  # Emit signal to notify that the scene has changed
 

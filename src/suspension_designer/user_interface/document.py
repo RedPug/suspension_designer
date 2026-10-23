@@ -181,7 +181,16 @@ class EditorDocument(Document):
     def __init__(self, name: str, filepath: str = None, scene: SceneState = None):
         super().__init__(name, filepath)
         self.scene_state = scene if scene is not None else SceneState()
+        self.scene_state.element_added.connect(self._select_added_element)
+        self.scene_state.element_removed.connect(self._unselect_removed_element)
         self.viewport = None
+
+    def _select_added_element(self, element):
+        self.selection_manager.set_selected(element)
+
+    def _unselect_removed_element(self, element):
+        if self.selection_manager.get_selected() is element:
+            self.selection_manager.set_selected(None)
 
     def create_tree_model(self) -> QAbstractItemModel:
         return SceneTreeModel(self)

@@ -284,15 +284,15 @@ def draw_reference_geometry(viewport, grid_n=10):
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     glDepthMask(GL_FALSE)
 
-    for plane in [geo for geo in viewport.scene_state._reference_geometry if isinstance(geo, PlaneReferenceElement)]:
+    for plane in [geo for geo in viewport.scene_state._reference_geometry if isinstance(geo, PlaneReferenceElement) and geo.visible]:
         draw_plane(viewport, plane)
 
     # glEnable(GL_LIGHTING)
     
-    for point in [geo for geo in viewport.scene_state._reference_geometry if isinstance(geo, PointReferenceElement)]:
+    for point in [geo for geo in viewport.scene_state._reference_geometry if isinstance(geo, PointReferenceElement) and geo.visible]:
         draw_point(viewport, point)
 
-    for line in [geo for geo in viewport.scene_state._reference_geometry if isinstance(geo, LineReferenceElement)]:
+    for line in [geo for geo in viewport.scene_state._reference_geometry if isinstance(geo, LineReferenceElement) and geo.visible]:
         draw_line(viewport, line)
 
     glDepthMask(GL_TRUE)

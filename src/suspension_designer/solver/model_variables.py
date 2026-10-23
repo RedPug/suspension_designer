@@ -209,7 +209,7 @@ class DisplacementVariable(ModelVariable):
                     get=lambda _: self.node,
                     set=LocalModifyElementCommandFactory(element_id=self.id, property_name='node'),
                     prop_editor=DropdownPropertyEditorFactory(
-                        options_callback = lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes}
+                        options_callback = lambda doc: {"No Selection": None} | {node.name: node for node in doc.scene_state.nodes}
                     )
                 ),
                 Property("Axis X",
@@ -309,14 +309,14 @@ class DistanceVariable(ModelVariable):
                     get=lambda _: self.node_a,
                     set=LocalModifyElementCommandFactory(element_id=self.id, property_name='node_a'),
                     prop_editor=DropdownPropertyEditorFactory(
-                        options_callback = lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.node_b}
+                        options_callback = lambda doc: {"No Selection": None} | {node.name: node for node in doc.scene_state.nodes if node != self.node_b}
                     )
                 ),
                 Property("Node B",
                     get=lambda _: self.node_b,
                     set=LocalModifyElementCommandFactory(element_id=self.id, property_name='node_b'),
                     prop_editor=DropdownPropertyEditorFactory(
-                        options_callback = lambda scene: {"No Selection": None} | {node.name: node for node in scene.nodes if node != self.node_a}
+                        options_callback = lambda doc: {"No Selection": None} | {node.name: node for node in doc.scene_state.nodes if node != self.node_a}
                     )
                 ),
             ]
