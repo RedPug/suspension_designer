@@ -1,296 +1,421 @@
 {
   "type": "editor",
-  "name": "Basic Suspension",
-  "id": "7edc5385-d77e-45fc-8596-21a5e6e6f6ce",
-  "nodes": [
-    {
-      "id": "4f71d11c-f44f-4934-b71d-e87fa81654c8",
-      "name": "Node 0",
-      "world_position": [
-        0.267,
-        0.26,
-        -0.165
+  "name": "Basic Susp",
+  "id": "f88ac637-0bae-461f-a0b0-8b98c8f46508",
+  "document_data": {
+    "name": "Basic Suspension",
+    "nodes": [
+      {
+        "id": "4f71d11c-f44f-4934-b71d-e87fa81654c8",
+        "name": "Node 0",
+        "world_position": [
+          -0.165,
+          0.267,
+          0.26
+        ]
+      },
+      {
+        "id": "01221927-08e7-4282-a55e-91e223a86e92",
+        "name": "Node 1",
+        "world_position": [
+          -0.153,
+          0.236,
+          0.11
+        ]
+      },
+      {
+        "id": "4602623a-09b7-4346-964c-0854ae56ab58",
+        "name": "Node 2",
+        "world_position": [
+          0.217,
+          0.24,
+          0.096
+        ]
+      },
+      {
+        "id": "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
+        "name": "Node 3",
+        "world_position": [
+          0.233,
+          0.245,
+          0.278
+        ]
+      },
+      {
+        "id": "e7bfe798-d6fe-418e-b027-f265ff1a9f22",
+        "name": "Node 4",
+        "world_position": [
+          -0.005,
+          0.565,
+          0.109
+        ]
+      },
+      {
+        "id": "6b271f4b-5a44-4ddb-b67d-93d409e83e58",
+        "name": "Node 10",
+        "world_position": [
+          0.0,
+          0.539,
+          0.3
+        ]
+      },
+      {
+        "id": "df522e2b-8839-428b-8e93-79e89fc16143",
+        "name": "Node 6",
+        "world_position": [
+          0.075,
+          0.57,
+          0.17
+        ]
+      },
+      {
+        "id": "e085b9df-7aa1-473c-8d86-621992f9c530",
+        "name": "Node 7",
+        "world_position": [
+          0.045,
+          0.213,
+          0.155
+        ]
+      },
+      {
+        "id": "db947294-1159-469b-831a-d24bf2a1c8e1",
+        "name": "Rocker Outer",
+        "world_position": [
+          0.005812649512807047,
+          0.3739871637785168,
+          0.42404492677519107
+        ]
+      },
+      {
+        "id": "6988eebb-0441-423c-ad66-eca869ee8ee8",
+        "name": "Rocker Pivot",
+        "world_position": [
+          0.005,
+          0.26,
+          0.37
+        ]
+      },
+      {
+        "id": "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
+        "name": "Coilover Mount",
+        "world_position": [
+          0.011512719528560596,
+          0.23500554291382228,
+          0.534980599801622
+        ]
+      },
+      {
+        "id": "e075c5bd-7ebb-455e-b7f5-be1068c202cb",
+        "name": "Rocker Pivot Stabilizer",
+        "world_position": [
+          0.03486,
+          0.26005,
+          0.36891
+        ]
+      },
+      {
+        "id": "04b1f8cd-5e33-43d1-abe5-3719fd6f625b",
+        "name": "Wheel Contact",
+        "world_position": [
+          0.0,
+          0.6415,
+          0.0
+        ]
+      },
+      {
+        "id": "358d66f1-51ff-4054-a588-addb50b0e39e",
+        "name": "Rocker to Pushrod",
+        "world_position": [
+          0.0043431063655989255,
+          0.3979820876363849,
+          0.39206269327265303
+        ]
+      },
+      {
+        "id": "81ab1eed-4076-4157-9f93-a3174e0426fc",
+        "name": "pushrod mount",
+        "world_position": [
+          -0.0063854950697240205,
+          0.5049742108641111,
+          0.1390902619756112
+        ]
+      }
+    ],
+    "edges": [
+      [
+        0,
+        1
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "01221927-08e7-4282-a55e-91e223a86e92",
-      "name": "Node 1",
-      "world_position": [
-        0.236,
-        0.11,
-        -0.153
+      [
+        1,
+        2
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "4602623a-09b7-4346-964c-0854ae56ab58",
-      "name": "Node 2",
-      "world_position": [
-        0.24,
-        0.096,
-        0.217
+      [
+        2,
+        3
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
-      "name": "Node 3",
-      "world_position": [
-        0.245,
-        0.278,
-        0.233
+      [
+        3,
+        0
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "e7bfe798-d6fe-418e-b027-f265ff1a9f22",
-      "name": "Node 4",
-      "world_position": [
-        0.565,
-        0.109,
-        -0.005
+      [
+        4,
+        5
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "6b271f4b-5a44-4ddb-b67d-93d409e83e58",
-      "name": "Node 5",
-      "world_position": [
-        0.539,
-        0.3,
-        0.0
+      [
+        5,
+        6
       ],
-      "locked_plane_id": "f19a0776-a7dc-4e5b-ba05-276ae1202238"
-    },
-    {
-      "id": "df522e2b-8839-428b-8e93-79e89fc16143",
-      "name": "Node 6",
-      "world_position": [
-        0.57,
-        0.17,
-        0.075
+      [
+        6,
+        4
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "e085b9df-7aa1-473c-8d86-621992f9c530",
-      "name": "Node 7",
-      "world_position": [
-        0.213,
-        0.155,
-        0.045
+      [
+        0,
+        3
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "db947294-1159-469b-831a-d24bf2a1c8e1",
-      "name": "Rocker Outer",
-      "world_position": [
-        0.35000000000000003,
-        0.4,
-        0.0
+      [
+        3,
+        5
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "6988eebb-0441-423c-ad66-eca869ee8ee8",
-      "name": "Rocker Pivot",
-      "world_position": [
-        0.25,
-        0.35000000000000003,
-        0.0
+      [
+        5,
+        0
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
-      "name": "Coilover Mount",
-      "world_position": [
-        0.25,
-        0.55,
-        0.0
+      [
+        1,
+        2
       ],
-      "locked_plane_id": null
-    },
-    {
-      "id": "e075c5bd-7ebb-455e-b7f5-be1068c202cb",
-      "name": "Rocker Pivot Stabilizer",
-      "world_position": [
-        0.25,
-        0.35000000000000003,
-        0.1
+      [
+        2,
+        4
       ],
-      "locked_plane_id": null
-    }
-  ],
-  "edges": [
-    [
-      0,
-      1
+      [
+        4,
+        1
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        7,
+        6
+      ]
     ],
-    [
-      1,
-      2
+    "geometry": [
+      {
+        "name": "Rocker Plane",
+        "id": "f19a0776-a7dc-4e5b-ba05-276ae1202238",
+        "type": "plane",
+        "constraints": [
+          {
+            "type": "literal_point",
+            "point": [
+              0.15,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": "f1a9e3c1-5d7b-4f8e-1c6b-2f1e3a1b2c3d"
+          },
+          {
+            "id": "4f71d11c-f44f-4934-b71d-e87fa81654c8"
+          }
+        ]
+      },
+      {
+        "name": "Rocker point1",
+        "id": "f1a9e3c1-5d7b-4f8e-0c6b-2f1e3a1b2c3d",
+        "type": "point",
+        "constraints": [
+          {
+            "type": "literal_point",
+            "point": [
+              0.1,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Rocker point2",
+        "id": "f1a9e3c1-5d7b-4f8e-1c6b-2f1e3a1b2c3d",
+        "type": "point",
+        "constraints": [
+          {
+            "type": "literal_point",
+            "point": [
+              0.0,
+              0.2,
+              0.0
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Rocker point3",
+        "id": "f1a9e3c1-5d7b-4f8e-2c6b-2f1e3a1b2c3d",
+        "type": "point",
+        "constraints": [
+          {
+            "type": "literal_point",
+            "point": [
+              0.0,
+              0.0,
+              0.3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Line",
+        "id": "f1a9e3c1-5d7b-4f8e-2c6b-2f1e521b2c3e",
+        "type": "line",
+        "constraints": [
+          {
+            "type": "literal_point",
+            "point": [
+              0.0,
+              0.2,
+              0.0
+            ]
+          },
+          {
+            "id": "f1a9e3c1-5d7b-4f8e-2c6b-2f1e3a1b2c3d"
+          }
+        ]
+      },
+      {
+        "name": "New Line",
+        "id": "4e5b4907-848e-424c-aa6d-7aa324dcba9e",
+        "type": "line",
+        "constraints": [
+          {
+            "id": "e085b9df-7aa1-473c-8d86-621992f9c530"
+          },
+          {
+            "id": "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c"
+          }
+        ]
+      },
+      {
+        "name": "New Point",
+        "id": "ccf2719c-8832-43d9-9fea-21200a88de3c",
+        "type": "point",
+        "constraints": [
+          {
+            "id": "f1a9e3c1-5d7b-4f8e-2c6b-2f1e521b2c3e"
+          },
+          {
+            "id": "4e5b4907-848e-424c-aa6d-7aa324dcba9e"
+          }
+        ]
+      },
+      {
+        "name": "New Plane",
+        "id": "115a7e1f-6a1b-4877-8e82-7555eee048b3",
+        "type": "plane",
+        "constraints": [
+          {
+            "id": "4e5b4907-848e-424c-aa6d-7aa324dcba9e"
+          },
+          {
+            "id": "4602623a-09b7-4346-964c-0854ae56ab58"
+          }
+        ]
+      }
     ],
-    [
-      2,
-      3
+    "groups": [
+      {
+        "name": "Chassis",
+        "id": "592605f7-905a-453d-a9ed-d1b0d3ecad56",
+        "node_ids": [
+          "4f71d11c-f44f-4934-b71d-e87fa81654c8",
+          "01221927-08e7-4282-a55e-91e223a86e92",
+          "4602623a-09b7-4346-964c-0854ae56ab58",
+          "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
+          "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
+          "6988eebb-0441-423c-ad66-eca869ee8ee8",
+          "e075c5bd-7ebb-455e-b7f5-be1068c202cb",
+          "e085b9df-7aa1-473c-8d86-621992f9c530"
+        ]
+      },
+      {
+        "name": "Upper Control Arm",
+        "id": "e004f939-5690-471d-a673-0653b326b5a7",
+        "node_ids": [
+          "4f71d11c-f44f-4934-b71d-e87fa81654c8",
+          "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
+          "6b271f4b-5a44-4ddb-b67d-93d409e83e58"
+        ]
+      },
+      {
+        "name": "Lower Control Arm",
+        "id": "4f7a2965-4f21-4cc2-a563-3a26e631970f",
+        "node_ids": [
+          "01221927-08e7-4282-a55e-91e223a86e92",
+          "4602623a-09b7-4346-964c-0854ae56ab58",
+          "e7bfe798-d6fe-418e-b027-f265ff1a9f22",
+          "81ab1eed-4076-4157-9f93-a3174e0426fc"
+        ]
+      },
+      {
+        "name": "Upright",
+        "id": "2f298951-9109-4960-9060-8f8fcbdbd084",
+        "node_ids": [
+          "e7bfe798-d6fe-418e-b027-f265ff1a9f22",
+          "6b271f4b-5a44-4ddb-b67d-93d409e83e58",
+          "df522e2b-8839-428b-8e93-79e89fc16143",
+          "04b1f8cd-5e33-43d1-abe5-3719fd6f625b"
+        ]
+      },
+      {
+        "name": "Toe Rod",
+        "id": "a33119ed-0f68-4604-a6e2-20b2a79a10e4",
+        "node_ids": [
+          "df522e2b-8839-428b-8e93-79e89fc16143",
+          "e085b9df-7aa1-473c-8d86-621992f9c530"
+        ]
+      },
+      {
+        "name": "Rocker",
+        "id": "b11e5a28-a16f-462b-a136-c8aab9e7e856",
+        "node_ids": [
+          "db947294-1159-469b-831a-d24bf2a1c8e1",
+          "6988eebb-0441-423c-ad66-eca869ee8ee8",
+          "e075c5bd-7ebb-455e-b7f5-be1068c202cb",
+          "358d66f1-51ff-4054-a588-addb50b0e39e"
+        ]
+      },
+      {
+        "name": "Pushrod",
+        "id": "27e21975-a002-462f-9899-20ed77c55e55",
+        "node_ids": [
+          "358d66f1-51ff-4054-a588-addb50b0e39e",
+          "81ab1eed-4076-4157-9f93-a3174e0426fc"
+        ]
+      }
     ],
-    [
-      3,
-      0
-    ],
-    [
-      4,
-      5
-    ],
-    [
-      5,
-      6
-    ],
-    [
-      6,
-      4
-    ],
-    [
-      0,
-      3
-    ],
-    [
-      3,
-      5
-    ],
-    [
-      5,
-      0
-    ],
-    [
-      1,
-      2
-    ],
-    [
-      2,
-      4
-    ],
-    [
-      4,
-      1
-    ],
-    [
-      6,
-      7
-    ],
-    [
-      7,
-      6
+    "model_variables": [
+      {
+        "name": "Heave",
+        "id": "e97a201c-8b3d-445a-87a6-a41b7e11ae06",
+        "type": "displacement",
+        "axis_x": 0.0,
+        "axis_y": 0.0,
+        "axis_z": -0.001,
+        "node_id": "04b1f8cd-5e33-43d1-abe5-3719fd6f625b"
+      },
+      {
+        "name": "Coilover Length",
+        "id": "1544ca11-37d7-4b2b-962c-a78fa49da958",
+        "type": "distance",
+        "node_a_id": "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
+        "node_b_id": "db947294-1159-469b-831a-d24bf2a1c8e1"
+      }
     ]
-  ],
-  "planes": [
-    {
-      "name": "Rocker Plane",
-      "id": "f19a0776-a7dc-4e5b-ba05-276ae1202238",
-      "mode": "containing",
-      "p0": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "p1": [
-        1.0,
-        0.0,
-        0.0
-      ],
-      "p2": [
-        0.0,
-        1.0,
-        0.0
-      ]
-    }
-  ],
-  "groups": [
-    {
-      "name": "Chassis",
-      "id": "592605f7-905a-453d-a9ed-d1b0d3ecad56",
-      "node_ids": [
-        "4f71d11c-f44f-4934-b71d-e87fa81654c8",
-        "01221927-08e7-4282-a55e-91e223a86e92",
-        "4602623a-09b7-4346-964c-0854ae56ab58",
-        "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
-        "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
-        "6988eebb-0441-423c-ad66-eca869ee8ee8",
-        "e075c5bd-7ebb-455e-b7f5-be1068c202cb"
-      ]
-    },
-    {
-      "name": "Upper Control Arm",
-      "id": "e004f939-5690-471d-a673-0653b326b5a7",
-      "node_ids": [
-        "4f71d11c-f44f-4934-b71d-e87fa81654c8",
-        "0e2c7816-abbf-4b29-830e-b0c1f5ff8b0c",
-        "6b271f4b-5a44-4ddb-b67d-93d409e83e58"
-      ]
-    },
-    {
-      "name": "Lower Control Arm",
-      "id": "4f7a2965-4f21-4cc2-a563-3a26e631970f",
-      "node_ids": [
-        "01221927-08e7-4282-a55e-91e223a86e92",
-        "4602623a-09b7-4346-964c-0854ae56ab58",
-        "e7bfe798-d6fe-418e-b027-f265ff1a9f22"
-      ]
-    },
-    {
-      "name": "Upright",
-      "id": "2f298951-9109-4960-9060-8f8fcbdbd084",
-      "node_ids": [
-        "e7bfe798-d6fe-418e-b027-f265ff1a9f22",
-        "6b271f4b-5a44-4ddb-b67d-93d409e83e58",
-        "df522e2b-8839-428b-8e93-79e89fc16143"
-      ]
-    },
-    {
-      "name": "Toe Rod",
-      "id": "a33119ed-0f68-4604-a6e2-20b2a79a10e4",
-      "node_ids": [
-        "df522e2b-8839-428b-8e93-79e89fc16143",
-        "e085b9df-7aa1-473c-8d86-621992f9c530"
-      ]
-    },
-    {
-      "name": "Rocker",
-      "id": "b11e5a28-a16f-462b-a136-c8aab9e7e856",
-      "node_ids": [
-        "db947294-1159-469b-831a-d24bf2a1c8e1",
-        "6988eebb-0441-423c-ad66-eca869ee8ee8",
-        "e075c5bd-7ebb-455e-b7f5-be1068c202cb"
-      ]
-    },
-    {
-      "name": "Pushrod",
-      "id": "27e21975-a002-462f-9899-20ed77c55e55",
-      "node_ids": [
-        "db947294-1159-469b-831a-d24bf2a1c8e1",
-        "e7bfe798-d6fe-418e-b027-f265ff1a9f22"
-      ]
-    }
-  ],
-  "model_variables": [
-    {
-      "name": "Heave",
-      "id": "e97a201c-8b3d-445a-87a6-a41b7e11ae06",
-      "type": "displacement",
-      "axis_x": 0.0,
-      "axis_y": 0.001,
-      "axis_z": 0.0,
-      "node_id": "e7bfe798-d6fe-418e-b027-f265ff1a9f22"
-    },
-    {
-      "name": "Coilover Length",
-      "id": "1544ca11-37d7-4b2b-962c-a78fa49da958",
-      "type": "distance",
-      "node_a_id": "f9e3aa40-587c-4a3e-a358-4feb15c4ed06",
-      "node_b_id": "db947294-1159-469b-831a-d24bf2a1c8e1"
-    }
-  ]
+  }
 }
